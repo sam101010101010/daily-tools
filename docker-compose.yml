@@ -1,0 +1,10 @@
+services:
+  backend-java:
+    build: { context: ., dockerfile: backend-java/Dockerfile }
+    expose: ["8080"]
+  web:
+    build: { context: ., dockerfile: frontend/Dockerfile }
+    environment:
+      - SITE_ADDRESS=:80
+    ports: ["8088:80"]
+    depends_on: [backend-java]
