@@ -1,9 +1,11 @@
 import type { ToolMeta } from './types';
 import { jsonMeta } from '../tools/json/meta';
+import { base64Meta } from '../tools/base64/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
-  // remaining tools registered by tools/*/meta.ts — populated in Tasks 7, 11, 12
+  base64Meta,
+  // remaining tools registered by tools/*/meta.ts — populated in Tasks 11, 12
 ];
 
 export function getTool(id: string): ToolMeta | undefined {
