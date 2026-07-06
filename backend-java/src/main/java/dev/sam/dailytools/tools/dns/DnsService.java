@@ -31,17 +31,27 @@ public class DnsService {
   @Service
   static class JndiDnsQuery implements DnsQuery {
     @Override public List<String> lookup(String domain, String type) {
+      InitialDirContext ctx = null;
       try {
         var env = new Hashtable<String, String>();
         env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
         env.put("java.naming.provider.url", "dns:");
-        Attributes attrs = new InitialDirContext(env).getAttributes(domain, new String[]{type});
+        ctx = new InitialDirContext(env);
+        Attributes attrs = ctx.getAttributes(domain, new String[]{type});
         Attribute attr = attrs.get(type);
         List<String> out = new ArrayList<>();
         if (attr != null) for (int i = 0; i < attr.size(); i++) out.add(String.valueOf(attr.get(i)));
         return out;
       } catch (NamingException e) {
         return List.of();
+      } finally {
+        if (ctx != null) {
+          try {
+            ctx.close();
+          } catch (NamingException ignored) {
+            // best-effort cleanup; nothing actionable if close fails
+          }
+        }
       }
     }
   }

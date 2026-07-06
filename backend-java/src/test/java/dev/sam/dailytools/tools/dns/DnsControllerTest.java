@@ -30,4 +30,12 @@ class DnsControllerTest {
        .andExpect(jsonPath("$.ok").value(true))
        .andExpect(jsonPath("$.data.records.A[0]").value("1.2.3.4"));
   }
+
+  @Test
+  void rejects_url_scheme_domain_as_validation_error() throws Exception {
+    mvc.perform(post("/api/java/dns").contentType("application/json").content("{\"domain\":\"ldap://attacker:1389/x\"}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.ok").value(false))
+       .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+  }
 }
