@@ -14,3 +14,8 @@ test('unknown tool id shows a not-found message', () => {
   renderAt('/tools/nope');
   expect(screen.getByText(/工具不存在/)).toBeInTheDocument();
 });
+
+test('renders a known tool lazily', async () => {
+  renderAt('/tools/json');
+  expect(await screen.findByText(/JSON/i)).toBeInTheDocument();
+});
