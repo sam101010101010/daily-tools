@@ -2,12 +2,13 @@ import type { ToolMeta } from './types';
 import { jsonMeta } from '../tools/json/meta';
 import { base64Meta } from '../tools/base64/meta';
 import { sslMeta } from '../tools/ssl/meta';
+import { dnsMeta } from '../tools/dns/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
   base64Meta,
   sslMeta,
-  // remaining tools registered by tools/*/meta.ts — populated in Tasks 11, 12
+  dnsMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {
