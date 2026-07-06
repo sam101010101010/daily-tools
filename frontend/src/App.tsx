@@ -1,9 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
-
-function Placeholder({ label }: { label: string }) {
-  return <p>{label}</p>;
-}
+import ToolPage from './pages/ToolPage';
 
 export default function App() {
   return (
@@ -12,7 +9,7 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/tools/:id" element={<Placeholder label="tool" />} />
+          <Route path="/tools/:id" element={<ToolPage />} />
         </Routes>
       </main>
     </BrowserRouter>
