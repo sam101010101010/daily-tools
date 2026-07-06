@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest
+@WebMvcTest(controllers = EnvelopeContractTest.PingController.class)
 @Import({EnvelopeContractTest.PingController.class, GlobalExceptionHandler.class})
 class EnvelopeContractTest {
   @Autowired MockMvc mvc;
