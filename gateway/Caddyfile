@@ -1,0 +1,12 @@
+{$SITE_ADDRESS} {
+	# language-first seam: one handle per backend language (add /api/python/* later)
+	handle /api/java/* {
+		reverse_proxy backend-java:8080
+	}
+	# SPA static + fallback
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
