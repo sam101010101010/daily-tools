@@ -1,0 +1,18 @@
+services:
+  web:
+    image: ghcr.io/sam101010101010/daily-tools-web:latest
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      - SITE_ADDRESS=${DOMAIN}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [backend-java]
+  backend-java:
+    image: ghcr.io/sam101010101010/daily-tools-backend:latest
+    restart: unless-stopped
+    expose: ["8080"]
+volumes:
+  caddy_data:
+  caddy_config:
