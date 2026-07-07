@@ -21,3 +21,31 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21, cache: maven }
       - run: mvn -B test
+  build-push:
+    needs: [frontend-test, backend-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/sam101010101010/daily-tools-web:latest
+            ghcr.io/sam101010101010/daily-tools-web:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend-java/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/sam101010101010/daily-tools-backend:latest
+            ghcr.io/sam101010101010/daily-tools-backend:${{ github.sha }}
