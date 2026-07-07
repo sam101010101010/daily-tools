@@ -1,6 +1,7 @@
 services:
   web:
     image: ghcr.io/sam101010101010/daily-tools-web:latest
+    pull_policy: never
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     environment:
@@ -11,6 +12,7 @@ services:
     depends_on: [backend-java]
   backend-java:
     image: ghcr.io/sam101010101010/daily-tools-backend:latest
+    pull_policy: never
     restart: unless-stopped
     expose: ["8080"]
 volumes:
