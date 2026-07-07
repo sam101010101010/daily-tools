@@ -2,6 +2,12 @@ name: CI/CD
 on:
   push: { branches: [main] }
   pull_request:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "image sha to (re)deploy for rollback; blank = current build"
+        required: false
+        default: ""
 concurrency: { group: "cicd-${{ github.ref }}", cancel-in-progress: false }
 jobs:
   frontend-test:
@@ -50,25 +56,58 @@ jobs:
             ghcr.io/sam101010101010/daily-tools-backend:latest
             ghcr.io/sam101010101010/daily-tools-backend:${{ github.sha }}
   deploy:
-    needs: build-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-push]
+    # push main: 需 build-push 绿。workflow_dispatch(回滚): 跳过 build-push 直接部署给定 sha。
+    if: >-
+      always() &&
+      ( github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build-push.result == 'success') )
     runs-on: ubuntu-latest
+    permissions: { contents: read, packages: read }
+    env:
+      # 回滚传入 sha，否则用本次 commit sha
+      TARGET_SHA: ${{ github.event.inputs.sha || github.sha }}
     steps:
-      - name: SSH deploy
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}            # 回滚: compose 取自目标 sha (push 时 == github.sha, 无副作用)
+      - uses: docker/login-action@v3            # 兼容 GHCR 转 private (ADR-0003 D4)；public 时也无害
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull images from GHCR and save to a tarball
+        run: |
+          set -e
+          W=ghcr.io/sam101010101010/daily-tools-web
+          B=ghcr.io/sam101010101010/daily-tools-backend
+          docker pull "$W:${TARGET_SHA}"
+          docker pull "$B:${TARGET_SHA}"
+          docker tag "$W:${TARGET_SHA}" "$W:latest"
+          docker tag "$B:${TARGET_SHA}" "$B:latest"
+          docker save "$W:latest" "$B:latest" | gzip > images.tar.gz
+      - name: Copy images + compose to the VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 30m
+          command_timeout: 30m
+          source: "images.tar.gz,deploy/docker-compose.prod.yml"
+          target: ${{ secrets.DEPLOY_PATH }}
+      - name: Load images + compose up on the VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          # GHCR→VPS pulls are slow from some regions; default 10m timeout is too tight.
           command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
-            git pull --ff-only
-            # --env-file: `-f deploy/...` makes deploy/ the project dir, so the repo-root
-            # .env (holding DOMAIN) isn't auto-loaded; load it explicitly or SITE_ADDRESS
-            # ends up empty and Caddy crash-loops.
-            docker compose --env-file .env -f deploy/docker-compose.prod.yml pull
+            gunzip -c images.tar.gz | docker load
+            rm -f images.tar.gz
+            # air-gap: 无 git pull / 无 compose pull；compose 的 pull_policy:never 用本地已 load 的 :latest
             docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d
             docker image prune -f
