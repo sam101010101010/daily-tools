@@ -1,0 +1,388 @@
+/* Daily Tools — global styles. Warm, friendly aesthetic:
+   warm-neutral surfaces, a single orange accent, soft card depth and
+   gentle hover motion. Light/dark auto via prefers-color-scheme.
+   No CSS framework — the components expose class hooks
+   (.tool-grid / .tool-card / .tool-card__cat / .error-view); the rest
+   is styled through element selectors scoped under the app shell. */
+
+:root {
+  --bg: #fbf5ef;
+  --bg-header: #fff9f4;
+  --surface: #ffffff;
+  --surface-sunken: #f6ede4;
+  --text: #2c2320;
+  --text-muted: #857066;
+  --border: #ecdccf;
+  --accent: #ec6a2b;
+  --accent-strong: #d5561b;
+  --accent-weak: rgba(236, 106, 43, 0.12);
+  --danger: #d63b30;
+  --danger-weak: #fdecea;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(89, 51, 25, 0.06), 0 6px 16px rgba(89, 51, 25, 0.07);
+  --shadow-hover: 0 4px 10px rgba(89, 51, 25, 0.10), 0 14px 30px rgba(89, 51, 25, 0.14);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #191411;
+    --bg-header: #211913;
+    --surface: #241c17;
+    --surface-sunken: #171210;
+    --text: #f3ebe4;
+    --text-muted: #b0a097;
+    --border: #38291f;
+    --accent: #ff8a4c;
+    --accent-strong: #ffa06a;
+    --accent-weak: rgba(255, 138, 76, 0.15);
+    --danger: #ff6b5e;
+    --danger-weak: #351d1a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.4);
+    --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.45), 0 14px 30px rgba(0, 0, 0, 0.55);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- App shell ---------------------------------------------------------- */
+
+header {
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+}
+
+header h1 {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 1.15rem 1.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+header h1::before {
+  content: "🧰";
+  font-size: 1.3em;
+}
+
+main {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* ---- Home: search + grid ------------------------------------------------ */
+
+input[type="search"] {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.75rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input[type="search"]::placeholder { color: var(--text-muted); }
+
+input[type="search"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1.1rem;
+}
+
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.tool-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--accent);
+}
+
+.tool-card:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+.tool-card h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tool-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  flex: 1;
+}
+
+.tool-card__cat {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: var(--accent-weak);
+  border-radius: 999px;
+}
+
+/* empty-state / loading text */
+main > section > p,
+main section > div > p {
+  color: var(--text-muted);
+}
+
+/* ---- Tool page ---------------------------------------------------------- */
+
+main section > p a {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: var(--accent-strong);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+main section > p a:hover { text-decoration: underline; }
+
+main h2 {
+  margin: 0.25rem 0 1.25rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+
+/* the tool bodies render inside a bare <div>; give it card framing.
+   :not(.tool-grid) keeps the home grid sitting flat on the page. */
+main section > div:not(.tool-grid) {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+/* ---- Form controls (textarea / input / buttons) ------------------------- */
+
+textarea,
+input[type="text"],
+input:not([type]) {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+textarea {
+  display: block;
+  margin-bottom: 1rem;
+  resize: vertical;
+  min-height: 7rem;
+  line-height: 1.5;
+}
+
+textarea:focus,
+input[type="text"]:focus,
+input:not([type]):focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+/* DNS/SSL: "Label <input/>" then a button on the same row */
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+label input:not([type]),
+label input[type="text"] {
+  width: auto;
+  min-width: 16rem;
+  font-family: var(--font);
+}
+
+label input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--accent);
+}
+
+button {
+  padding: 0.6rem 1.15rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.05s, box-shadow 0.15s;
+}
+
+button:hover:not(:disabled) { background: var(--accent-strong); }
+button:active:not(:disabled) { transform: translateY(1px); }
+
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button + button { margin-left: 0.5rem; }
+label + button { margin-left: 0.75rem; }
+
+/* ---- Output surfaces ---------------------------------------------------- */
+
+pre {
+  margin: 1.25rem 0 0;
+  padding: 1rem 1.1rem;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  max-height: 28rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* SSL: definition list of cert fields */
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.25rem;
+  margin: 1.25rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+dt {
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
+dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+/* DNS: one block per record type */
+main section h4 {
+  margin: 1.25rem 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-strong);
+}
+
+main section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+main section li {
+  padding: 0.45rem 0.7rem;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  word-break: break-word;
+}
+
+/* ---- Error view --------------------------------------------------------- */
+
+.error-view {
+  margin: 1.25rem 0 0;
+  padding: 0.75rem 1rem;
+  color: var(--danger);
+  background: var(--danger-weak);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+/* ---- Responsive & motion ------------------------------------------------ */
+
+@media (max-width: 560px) {
+  main { padding: 1.5rem 1.1rem 3rem; }
+  header h1 { padding: 1rem 1.1rem; }
+  main section > div { padding: 1.15rem; }
+  label input:not([type]),
+  label input[type="text"] { min-width: 0; width: 100%; }
+  label { width: 100%; }
+  label + button { margin: 0.75rem 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .tool-card:hover { transform: none; }
+}
