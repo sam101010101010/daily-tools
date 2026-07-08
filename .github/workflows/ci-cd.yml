@@ -63,51 +63,40 @@ jobs:
       ( github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build-push.result == 'success') )
     runs-on: ubuntu-latest
-    permissions: { contents: read, packages: read }
+    permissions: { contents: read }            # 仅 checkout 需要；runner 不再 pull GHCR，无需 packages:read
     env:
       # 回滚传入 sha，否则用本次 commit sha
       TARGET_SHA: ${{ github.event.inputs.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TARGET_SHA }}            # 回滚: compose 取自目标 sha (push 时 == github.sha, 无副作用)
-      - uses: docker/login-action@v3            # 兼容 GHCR 转 private (ADR-0003 D4)；public 时也无害
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Pull images from GHCR and save to a tarball
+          ref: ${{ env.TARGET_SHA }}            # 回滚: compose 取自目标 sha (push 时 == github.sha)
+      - name: Pin compose image tags to the target sha
         run: |
           set -e
-          W=ghcr.io/sam101010101010/daily-tools-web
-          B=ghcr.io/sam101010101010/daily-tools-backend
-          docker pull "$W:${TARGET_SHA}"
-          docker pull "$B:${TARGET_SHA}"
-          docker tag "$W:${TARGET_SHA}" "$W:latest"
-          docker tag "$B:${TARGET_SHA}" "$B:latest"
-          docker save "$W:latest" "$B:latest" | gzip > images.tar.gz
-      - name: Copy images + compose to the VPS
+          # 钉死确定的 sha（不靠漂移的 :latest）；VPS 拉这个 sha，部署可复现、回滚天然 (ADR-0004 D2)
+          sed -i "s#\(ghcr.io/sam101010101010/daily-tools-[a-z]*\):latest#\1:${TARGET_SHA}#g" deploy/docker-compose.prod.yml
+          grep 'image:' deploy/docker-compose.prod.yml
+      - name: Copy compose to the VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          timeout: 30m
-          command_timeout: 30m
-          source: "images.tar.gz,deploy/docker-compose.prod.yml"
+          source: "deploy/docker-compose.prod.yml"        # 只传小 compose，无需自定义 timeout（默认足够）
           target: ${{ secrets.DEPLOY_PATH }}
-      - name: Load images + compose up on the VPS
+      - name: Pull from ghcr.io + compose up on the VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 30m
+          command_timeout: 30m                   # 兜首次全量拉 ghcr(~9min)；后续增量层更快
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
-            gunzip -c images.tar.gz | docker load
-            rm -f images.tar.gz
-            # air-gap: 无 git pull / 无 compose pull；compose 的 pull_policy:never 用本地已 load 的 :latest
+            # ADR-0004: VPS 从 ghcr.io CDN 增量拉镜像；仍不连 github.com（compose 由 runner scp 下发）
+            docker compose --env-file .env -f deploy/docker-compose.prod.yml pull
             docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d
-            docker image prune -f
+            # -a: 镜像按 sha 打 tag（非漂移 :latest），旧 sha 不会变 dangling；-a 清掉不再被容器引用的旧 sha，防磁盘累积
+            docker image prune -af
