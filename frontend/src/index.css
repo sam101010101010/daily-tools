@@ -19,6 +19,19 @@
   --danger: #d63b30;
   --danger-weak: #fdecea;
   --on-accent: #ffffff; /* text/icon on an --accent fill */
+  /* code / diff semantic colours (ADR-0006) — scoped to code-render surfaces
+     (JSON syntax + diff status), not chrome; functional multi-hue by design. */
+  --json-key: #9c4221;
+  --json-string: #3d7a34;
+  --json-number: #1c6ca8;
+  --json-boolean: #8a4bb0;
+  --json-null: #857066;
+  --diff-add: #2f7d32;
+  --diff-add-bg: rgba(47, 125, 50, 0.12);
+  --diff-del: #c0392b;
+  --diff-del-bg: rgba(192, 57, 43, 0.10);
+  --diff-change: #b06f16;
+  --diff-change-bg: rgba(176, 111, 22, 0.12);
   --radius: 12px;
   --radius-sm: 8px;
   --shadow: 0 1px 2px rgba(89, 51, 25, 0.06), 0 6px 16px rgba(89, 51, 25, 0.07);
@@ -44,6 +57,17 @@
     --danger-weak: #351d1a;
     /* dark accents are lighter, so a dark ink keeps buttons AA-legible */
     --on-accent: #2a1c12;
+    --json-key: #f0a86a;
+    --json-string: #9ccd84;
+    --json-number: #78bdec;
+    --json-boolean: #c7a0ea;
+    --json-null: #b0a097;
+    --diff-add: #86c98a;
+    --diff-add-bg: rgba(134, 201, 138, 0.16);
+    --diff-del: #ef8a80;
+    --diff-del-bg: rgba(239, 138, 128, 0.16);
+    --diff-change: #e0b062;
+    --diff-change-bg: rgba(224, 176, 98, 0.16);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.4);
     --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.45), 0 14px 30px rgba(0, 0, 0, 0.55);
   }
