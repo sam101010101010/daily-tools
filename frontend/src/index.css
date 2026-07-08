@@ -413,3 +413,156 @@ main section li {
   * { transition: none !important; }
   .tool-card:hover { transform: none; }
 }
+
+/* ---- JSON workbench ----------------------------------------------------- */
+
+.json-workbench {
+  display: flex;
+  gap: 1rem;
+  height: 70vh;
+  min-height: 22rem;
+}
+
+.json-workbench__pane {
+  flex: 1 1 50%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.json-workbench__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.json-workbench__ta {
+  flex: 1 1 0;
+  margin: 0;
+  resize: none;
+  min-height: 4rem;
+}
+
+.json-workbench__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.json-workbench__tabs { display: inline-flex; gap: 0.25rem; margin-right: 0.35rem; }
+
+.json-workbench button.json-workbench__tab,
+.json-workbench button.json-workbench__btn,
+.json-tree button.json-tree__ctl {
+  padding: 0.32rem 0.72rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 0;
+}
+
+.json-workbench button.json-workbench__tab:hover:not(:disabled),
+.json-workbench button.json-workbench__btn:hover:not(:disabled),
+.json-tree button.json-tree__ctl:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-sunken);
+  border-color: var(--accent);
+}
+
+.json-workbench button.json-workbench__tab.is-active,
+.json-workbench button.json-workbench__btn.is-active {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.json-tree button.json-tree__ctl { padding: 0.22rem 0.6rem; font-size: 0.78rem; }
+.json-workbench__diff-toggle { margin-left: auto; }
+.json-workbench__path { margin: 0; font-size: 0.85rem; padding: 0.4rem 0.6rem; }
+
+.json-workbench__body {
+  flex: 1 1 0;
+  overflow: auto;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.85rem;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+}
+
+.json-workbench__pre {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  max-height: none;
+  white-space: pre;
+}
+
+.json-workbench__status { font-size: 0.8rem; color: var(--text-muted); }
+
+/* tree view — reset the DNS-oriented `main section ul/li` rules */
+.json-tree__controls { display: flex; gap: 0.35rem; margin-bottom: 0.5rem; }
+.json-tree ul { list-style: none; margin: 0; padding: 0; display: block; }
+.json-tree__root ul { padding-left: 1.05rem; border-left: 1px dashed var(--border); }
+.json-tree li { display: block; margin: 0; padding: 0; background: none; border: none; line-height: 1.55; }
+.json-tree__toggle { cursor: pointer; }
+.json-tree__caret { display: inline-block; width: 1em; color: var(--text-muted); }
+.json-tree__key { color: var(--json-key); }
+.json-tree__index { color: var(--text-muted); }
+.json-tree__punct { color: var(--text-muted); }
+.json-tree__string { color: var(--json-string); }
+.json-tree__number { color: var(--json-number); }
+.json-tree__boolean { color: var(--json-boolean); }
+.json-tree__null { color: var(--json-null); font-style: italic; }
+
+/* table view */
+.json-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+.json-table th, .json-table td {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.json-table th { position: sticky; top: -0.7rem; background: var(--surface); color: var(--json-key); }
+.json-table__fallback { color: var(--text-muted); margin: 0; }
+
+/* diff view — reset the DNS-oriented `main section ul/li` rules */
+.diff-view { list-style: none; margin: 0; padding: 0; display: block; }
+.diff-view__empty { color: var(--text-muted); margin: 0; }
+.diff-line {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.15rem 0.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+}
+.diff-line__mark { width: 1em; font-weight: 700; }
+.diff-line__path { color: var(--text-muted); }
+.diff-line__val { word-break: break-word; }
+.diff-line--add { background: var(--diff-add-bg); }
+.diff-line--del { background: var(--diff-del-bg); }
+.diff-line--change { background: var(--diff-change-bg); }
+.diff-line--add .diff-line__mark { color: var(--diff-add); }
+.diff-line--del .diff-line__mark { color: var(--diff-del); }
+.diff-line--change .diff-line__mark { color: var(--diff-change); }
+
+@media (max-width: 560px) {
+  .json-workbench { flex-direction: column; height: auto; }
+  .json-workbench__ta { min-height: 9rem; }
+  .json-workbench__body { min-height: 14rem; }
+  .json-workbench__diff-toggle { margin-left: 0; }
+}
