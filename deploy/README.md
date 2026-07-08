@@ -2,11 +2,13 @@
 
 One-time setup that gives the auto-deploy pipeline a real target. After this is
 done once, every push to `main` runs `test → build-push → deploy` (see
-`.github/workflows/ci-cd.yml`) and the `deploy` job SSHes in to `docker load` +
-`docker compose up -d` — no further manual steps. The VPS never contacts
-`github.com` or `ghcr.io`: the runner `docker save`s the images, `scp`s the
-tarball (and the compose file) to the VPS, and the VPS only `docker load`s
-what arrives.
+`.github/workflows/ci-cd.yml`): the `deploy` job `scp`s the (tag-pinned) compose
+file to the VPS and SSHes in to `docker compose pull && up -d` — no further
+manual steps. The VPS never contacts `github.com` (the runner holds the repo and
+`scp`s only the small compose file), but it **does** pull the images from
+`ghcr.io` — which is CDN-fronted and fast, and fetches only changed layers on
+later deploys, so a deploy is ~9min the first time and ~2–3min after
+([ADR-0004](../adr/0004-deploy-ghcr-pull.md)).
 
 The live app is a single `web` service (Caddy: static host + `/api/<lang>/`
 gateway + automatic HTTPS) plus the `backend-java` service — **2 containers**
@@ -62,15 +64,16 @@ sudo chmod 600 /home/deploy/.ssh/authorized_keys
 
 ## 3. Create the deploy directory
 
-The pipeline `scp`s the compose file and image tarball here; no git clone needed.
+The pipeline `scp`s the (tag-pinned) compose file here; no git clone needed.
 
 ```bash
 sudo -u deploy mkdir -p /home/deploy/daily-tools
 ```
 
 This path (`/home/deploy/daily-tools`) is the `DEPLOY_PATH` secret — just a
-directory holding `.env` and receiving the runner's `scp`. The runner drops
-`deploy/docker-compose.prod.yml` and `images.tar.gz` into it on every deploy.
+directory holding `.env` and receiving the runner's `scp`. The runner drops the
+tag-pinned `deploy/docker-compose.prod.yml` into it on every deploy; the VPS then
+`docker compose pull`s the images from ghcr.io.
 
 ## 4. Create `.env` (sets the domain)
 
@@ -85,7 +88,7 @@ sudo -u deploy sh -c "printf 'DOMAIN=<your-real-domain>\n' > .env"
 
 `.env` is gitignored in the source repo — it never gets committed, and it
 persists on the VPS across deploys since the pipeline only overwrites the
-compose file and image tarball, not `.env`. Caddy reads `DOMAIN` via
+compose file, not `.env`. Caddy reads `DOMAIN` via
 `SITE_ADDRESS=${DOMAIN}` in `deploy/docker-compose.prod.yml` and auto-issues a
 Let's Encrypt certificate for it.
 
@@ -114,43 +117,39 @@ Repo → Settings → Secrets and variables → Actions → **New repository sec
 
 These map 1:1 to the `deploy` job's `secrets.*` references in `ci-cd.yml`.
 
-## 7. GHCR image visibility (public or private both work)
+## 7. Make the GHCR images public
 
-Air-gap deploy means the VPS never pulls from GHCR at all — only the runner
-does, authenticating with `GITHUB_TOKEN`
-([ADR-0003](../adr/0003-deploy-airgap-scp.md) D4). So making
-`daily-tools-web` / `daily-tools-backend` public is no longer required for the
-VPS to function; keep them public or switch to private, either works. Nothing
-to configure here unless you have another reason to change visibility
-(GitHub → your profile → Packages → package → **Package settings → Change
-visibility**).
+The VPS pulls the images from `ghcr.io` on every deploy, so the two packages must
+be pullable without VPS-side credentials. Make `daily-tools-web` and
+`daily-tools-backend` **public**: GitHub → your profile → Packages → the package →
+**Package settings → Change visibility → Public** (they first appear after the
+first push to `main`) ([ADR-0004](../adr/0004-deploy-ghcr-pull.md) D4).
+
+> If you must keep them private, instead run `docker login ghcr.io` on the VPS as
+> `deploy` with a PAT (`read:packages`) before the first deploy.
 
 ## 8. First-start self-check (on the VPS)
 
-There's no manual `pull` here — air-gap means the VPS never pulls; the images
-arrive as a tarball the pipeline `scp`s and `docker load`s in. Once the first
-pipeline run has landed the compose file + image tarball and loaded them
-(and secrets are set), you can verify manually:
+After the first automated deploy has landed the compose file (and secrets are
+set), you can re-run the deploy steps by hand — the VPS pulls the images from
+ghcr.io:
 
 ```bash
 cd /home/deploy/daily-tools
+sudo -u deploy docker compose -f deploy/docker-compose.prod.yml pull   # first pull ~9min (full image), later ~2-3min (changed layers only)
 sudo -u deploy docker compose -f deploy/docker-compose.prod.yml up -d
 docker compose -f deploy/docker-compose.prod.yml ps    # both `web` and `backend-java` Up
 docker compose -f deploy/docker-compose.prod.yml logs web | grep -i 'certificate\|serving'
 ```
 
-If you need to load images manually (before the pipeline has run once), do it
-from the runner or your own machine — the VPS itself never fetches from GHCR:
-
-```bash
-docker pull ghcr.io/sam101010101010/daily-tools-web:latest
-docker pull ghcr.io/sam101010101010/daily-tools-backend:latest
-docker save ghcr.io/sam101010101010/daily-tools-web:latest ghcr.io/sam101010101010/daily-tools-backend:latest | ssh deploy@<vps-host> 'docker load'
-```
-
 Expected: 2 services Up; `web` obtains a certificate for your domain and starts
 serving. `caddy_data` (a named volume) persists the issued cert across restarts,
 so repeated `up -d` won't re-issue and hit Let's Encrypt rate limits.
+
+> The compose file on the VPS is placed by the pipeline (`scp`), tag-pinned to a
+> specific image sha — there is no git clone. Before the very first pipeline run
+> there is no compose file on the VPS yet; let the pipeline land it, or copy one
+> over manually.
 
 ---
 
@@ -173,7 +172,7 @@ D4 的响应信封）。
 **回滚**：两种方式均可，镜像不会因为不再 build 而消失——旧 sha 对应的 GHCR 镜像长期留存：
 
 - GitHub → **Actions** → `CI/CD` workflow → **Run workflow**，`sha` 输入填要回退
-  到的历史 commit sha → runner 用该 sha 重新 **拉**（`GITHUB_TOKEN` 从 GHCR）→
-  **存盘**（`docker save`）→ `scp` → VPS `docker load` → `up -d`。
+  到的历史 commit sha → deploy job 把 compose 的 image tag 钉成该 sha、`scp` 给 VPS →
+  VPS 从 ghcr.io `docker compose pull` 该 sha → `up -d`。
 - 或者本地 `git revert` 目标 commit 后 push 到 `main`，走正常的
   `test → build-push → deploy` 管线（会为 revert 后的新 commit 重新 build 镜像）。
