@@ -4,6 +4,8 @@ import dev.sam.dailytools.common.ToolException;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -11,28 +13,67 @@ import java.security.NoSuchAlgorithmException;
 
 /**
  * Symmetric crypto via the JDK's JCE (ADR-0007). This class never logs any request field (key,
- * passphrase, plaintext). T1 implements the AES/ECB path plus key resolution; CBC/GCM (T2) and
- * refined error classification (T3) build on it.
+ * passphrase, plaintext). T1 implements the AES/ECB path plus key resolution; T2 adds CBC/GCM with
+ * IV/nonce validation; refined error classification (DECRYPT_FAILED / VALIDATION_ERROR) lands in T3.
  */
 @Service
 public class CryptoService {
 
+  private static final int GCM_TAG_BITS = 128; // JCE default; tag is appended to the ciphertext.
+
   public CryptoResult transform(CryptoRequest req) {
     boolean encrypt = !"decrypt".equals(req.op());
     byte[] keyBytes = resolveKey(req);
+    byte[] iv = resolveIv(req); // null for ECB; validated 16B (CBC) / 12B (GCM) otherwise
     String inputEnc = orDefault(req.inputEnc(), encrypt ? "utf8" : "base64");
     String outputEnc = orDefault(req.outputEnc(), encrypt ? "base64" : "utf8");
     byte[] inputBytes = ByteCodec.decode(req.input(), inputEnc);
     try {
-      Cipher cipher = Cipher.getInstance("AES/" + req.mode() + "/" + req.padding());
-      cipher.init(encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
+      // GCM is an AEAD stream mode; padding is meaningless and forced to NoPadding.
+      String padding = "GCM".equals(req.mode()) ? "NoPadding" : req.padding();
+      Cipher cipher = Cipher.getInstance("AES/" + req.mode() + "/" + padding);
+      SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
+      int cipherMode = encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE;
+      switch (req.mode()) {
+        case "ECB" -> cipher.init(cipherMode, keySpec);
+        case "CBC" -> cipher.init(cipherMode, keySpec, new IvParameterSpec(iv));
+        case "GCM" -> cipher.init(cipherMode, keySpec, new GCMParameterSpec(GCM_TAG_BITS, iv));
+        default -> throw new ToolException("VALIDATION_ERROR", "未知加密模式：" + req.mode());
+      }
       byte[] out = cipher.doFinal(inputBytes);
-      return new CryptoResult(ByteCodec.encode(out, outputEnc), "");
+      String ivEcho = iv == null ? "" : ByteCodec.encode(iv, orDefault(req.ivEnc(), "hex"));
+      return new CryptoResult(ByteCodec.encode(out, outputEnc), ivEcho);
     } catch (GeneralSecurityException e) {
       // Failure classification (DECRYPT_FAILED / VALIDATION_ERROR) is refined in T3; keep it
       // non-revealing for now rather than leaking the raw JCE exception message.
       throw new ToolException("INTERNAL_ERROR", "加解密失败");
     }
+  }
+
+  /**
+   * Resolve and validate the IV/nonce for the requested mode: ECB has none (returns {@code null}),
+   * CBC needs a 16-byte IV, GCM needs a 12-byte nonce. A missing or wrong-length value is a
+   * {@code VALIDATION_ERROR} — surfaced before {@link Cipher#init} so it can't leak as INTERNAL_ERROR.
+   */
+  private static byte[] resolveIv(CryptoRequest req) {
+    int required = switch (req.mode()) {
+      case "CBC" -> 16;
+      case "GCM" -> 12;
+      default -> -1; // ECB (and anything else) carries no IV here
+    };
+    if (required < 0) {
+      return null;
+    }
+    String label = "GCM".equals(req.mode()) ? "GCM nonce" : "CBC IV";
+    if (req.iv() == null || req.iv().isEmpty()) {
+      throw new ToolException("VALIDATION_ERROR", label + "（" + required + " 字节）未提供");
+    }
+    byte[] iv = ByteCodec.decode(req.iv(), orDefault(req.ivEnc(), "hex"));
+    if (iv.length != required) {
+      throw new ToolException("VALIDATION_ERROR",
+          label + " 必须为 " + required + " 字节，当前 " + iv.length);
+    }
+    return iv;
   }
 
   /**

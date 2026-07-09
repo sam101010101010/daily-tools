@@ -68,6 +68,98 @@ class CryptoServiceTest {
     assertThat(r.iv()).isEmpty();
   }
 
+  // --- CBC / GCM (T2) ---
+
+  // SP800-38A F.2.1 AES-128 CBC single-block known-answer vector (authoritative).
+  @Test
+  void sp800_38a_aes128_cbc_nopadding_kat() {
+    CryptoResult r = service.transform(new Req()
+        .mode("CBC").padding("NoPadding")
+        .key("2b7e151628aed2a6abf7158809cf4f3c").keyEnc("hex")
+        .iv("000102030405060708090a0b0c0d0e0f").ivEnc("hex")
+        .input("6bc1bee22e409f96e93d7e117393172a").inputEnc("hex")
+        .outputEnc("hex").build());
+    assertThat(r.output()).isEqualTo("7649abac8119b246cee98e9b12e9197d");
+  }
+
+  @Test
+  void cbc_result_echoes_iv_actually_used() {
+    CryptoResult r = service.transform(new Req()
+        .mode("CBC").padding("NoPadding")
+        .key("2b7e151628aed2a6abf7158809cf4f3c").keyEnc("hex")
+        .iv("000102030405060708090a0b0c0d0e0f").ivEnc("hex")
+        .input("6bc1bee22e409f96e93d7e117393172a").inputEnc("hex")
+        .outputEnc("hex").build());
+    assertThat(r.iv()).isEqualTo("000102030405060708090a0b0c0d0e0f");
+  }
+
+  @Test
+  void cbc_pkcs5_roundtrip_recovers_plaintext() {
+    Req base = new Req().mode("CBC").padding("PKCS5Padding")
+        .key("0123456789abcdef").keyEnc("utf8")          // 16-byte AES-128 key
+        .iv("00112233445566778899aabbccddeeff").ivEnc("hex"); // 16-byte IV
+    CryptoResult enc = service.transform(base.copy().op("encrypt")
+        .input("hello, 世界").inputEnc("utf8").outputEnc("base64").build());
+    CryptoResult dec = service.transform(base.copy().op("decrypt")
+        .input(enc.output()).inputEnc("base64").outputEnc("utf8").build());
+    assertThat(dec.output()).isEqualTo("hello, 世界");
+  }
+
+  @Test
+  void gcm_roundtrip_recovers_plaintext() {
+    Req base = new Req().mode("GCM").padding("NoPadding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .iv("000102030405060708090a0b").ivEnc("hex");    // 12-byte nonce
+    CryptoResult enc = service.transform(base.copy().op("encrypt")
+        .input("hello, 世界").inputEnc("utf8").outputEnc("base64").build());
+    CryptoResult dec = service.transform(base.copy().op("decrypt")
+        .input(enc.output()).inputEnc("base64").outputEnc("utf8").build());
+    assertThat(dec.output()).isEqualTo("hello, 世界");
+  }
+
+  @Test
+  void gcm_ciphertext_is_plaintext_plus_16_byte_tag() {
+    CryptoResult enc = service.transform(new Req()
+        .op("encrypt").mode("GCM").padding("NoPadding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .iv("000102030405060708090a0b").ivEnc("hex")
+        .input("0123456789").inputEnc("utf8")            // 10 plaintext bytes
+        .outputEnc("hex").build());
+    assertThat(enc.output()).hasSize((10 + 16) * 2);     // (plaintext + tag) bytes as hex
+  }
+
+  @Test
+  void cbc_missing_iv_is_validation_error() {
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("encrypt").mode("CBC").padding("PKCS5Padding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .input("hi").inputEnc("utf8").build()))          // no IV supplied
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
+  @Test
+  void cbc_short_iv_is_validation_error() {
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("encrypt").mode("CBC").padding("PKCS5Padding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .iv("00112233445566778899aabbccddee").ivEnc("hex") // 15 bytes
+        .input("hi").inputEnc("utf8").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
+  @Test
+  void gcm_short_nonce_is_validation_error() {
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("encrypt").mode("GCM").padding("NoPadding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .iv("000102030405060708090a").ivEnc("hex")       // 11 bytes
+        .input("hi").inputEnc("utf8").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
   // --- ByteCodec ---
 
   @Test
@@ -178,6 +270,8 @@ class CryptoServiceTest {
     Req keyHash(String v) { keyHash = v; return this; }
     Req key(String v) { key = v; return this; }
     Req keyEnc(String v) { keyEnc = v; return this; }
+    Req iv(String v) { iv = v; return this; }
+    Req ivEnc(String v) { ivEnc = v; return this; }
     Req input(String v) { input = v; return this; }
     Req inputEnc(String v) { inputEnc = v; return this; }
     Req outputEnc(String v) { outputEnc = v; return this; }
