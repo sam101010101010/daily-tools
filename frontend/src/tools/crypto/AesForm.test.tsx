@@ -62,6 +62,25 @@ test('typing a preset name enters preset mode and submits a passphrase-free requ
   expect(body.mode).toBeUndefined();       // backend derives mode/padding from the preset
 });
 
+test('preset mode omits encoding overrides so the backend applies per-op legacy-hex defaults', async () => {
+  render(<AesForm mode="ECB" />);
+  await userEvent.type(screen.getByLabelText('密钥'), 'tapdata');
+  await userEvent.type(screen.getByLabelText('输入'), '414932aaef43ec67ab32846f090bc033');
+  await userEvent.click(screen.getByRole('button', { name: '解密' }));
+  const body = vi.mocked(callTool).mock.calls[0][1] as Record<string, unknown>;
+  expect(body).toMatchObject({ op: 'decrypt', keySource: 'preset', preset: 'tapdata' });
+  expect(body.inputEnc).toBeUndefined();   // decrypt defaults to hex-in on the backend
+  expect(body.outputEnc).toBeUndefined();  // ...and utf8-out — one-click, no manual toggling
+});
+
+test('preset mode hides the input/output encoding selects', async () => {
+  render(<AesForm mode="ECB" />);
+  expect(screen.getByLabelText('输入编码')).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText('密钥'), 'tapdata');
+  expect(screen.queryByLabelText('输入编码')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('输出编码')).not.toBeInTheDocument();
+});
+
 test('changing the key away from a preset name exits preset mode', async () => {
   render(<AesForm mode="CBC" />);
   await userEvent.type(screen.getByLabelText('密钥'), 'tapdata');

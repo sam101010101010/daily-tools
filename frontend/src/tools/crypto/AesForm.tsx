@@ -81,7 +81,9 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
     // Preset mode sends only the name — the backend supplies passphrase/mode/padding. Otherwise
     // build the full CryptoRequest from the form fields.
     const body = activePreset
-      ? { op, keySource: 'preset', preset: key, input, inputEnc, outputEnc }
+      // Omit inputEnc/outputEnc so the backend applies the legacy-hex per-op defaults
+      // (encrypt: utf8→hex, decrypt: hex→utf8) — the preset is one-click in both directions.
+      ? { op, keySource: 'preset', preset: key, input }
       : {
           op, mode, padding: effectivePadding,
           keySource, keyHash: isHash ? keyHash : undefined,
@@ -146,8 +148,9 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
       <label>输入{' '}
         <textarea aria-label="输入" value={input} onChange={e => setInput(e.target.value)} rows={4} />
       </label>
-      <EncSelect label="输入编码" value={inputEnc} onChange={setInputEnc} />
-      <EncSelect label="输出编码" value={outputEnc} onChange={setOutputEnc} />
+      {/* In preset mode the backend fixes the encodings per op, so these selects would mislead. */}
+      {!locked && <EncSelect label="输入编码" value={inputEnc} onChange={setInputEnc} />}
+      {!locked && <EncSelect label="输出编码" value={outputEnc} onChange={setOutputEnc} />}
 
       <div>
         <button onClick={() => run('encrypt')} disabled={loading || !key || !input}>加密</button>
