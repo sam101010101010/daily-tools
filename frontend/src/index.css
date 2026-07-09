@@ -566,3 +566,110 @@ main section li {
   .json-workbench__body { min-height: 14rem; }
   .json-workbench__diff-toggle { margin-left: 0; }
 }
+
+/* ---- Crypto tool -------------------------------------------------------- */
+/* Base64 / AES tool. The outer card comes from `main section > div`; inside,
+   the form reads as one warm column of labelled groups (选项 / 输入 / 输出),
+   each an uppercase header rule sitting over its controls. Layout only —
+   every colour goes through a token. */
+
+.crypto {
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+}
+
+/* protocol picker sits on its own row above the groups */
+.crypto__protocol { font-weight: 600; }
+
+/* a labelled section: uppercase header with an underline rule, then controls */
+.crypto__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.crypto__legend {
+  display: block;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* a row of controls that wraps; each label+control pair stays glued */
+.crypto__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+}
+
+/* a field whose input should grow to fill the row (key / IV / echo) */
+.crypto__field { flex: 1 1 18rem; min-width: 0; }
+
+.crypto__field input:not([type]),
+.crypto__field input[type="text"] {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}
+
+/* selects adopt the sunken input surface instead of raw browser chrome */
+.crypto select {
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.crypto select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.crypto select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+/* textareas / pre are framed globally; drop their outer margins so the
+   flex-column gap owns the vertical rhythm */
+.crypto textarea { margin-bottom: 0; }
+.crypto__group pre { margin: 0; }
+
+.crypto__actions { display: flex; gap: 0.5rem; }
+.crypto__actions button + button { margin-left: 0; }
+
+.crypto__status { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+
+/* ECB insecurity caution — soft danger chip, not a hard error box */
+.crypto-warn {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--danger);
+  background: var(--danger-weak);
+  border-radius: var(--radius-sm);
+}
+
+/* applied-preset badge — informational accent chip */
+.crypto-preset-badge {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: var(--accent-weak);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 560px) {
+  .crypto__field { flex-basis: 100%; }
+  .crypto__actions { flex-wrap: wrap; }
+}

@@ -34,8 +34,8 @@ export default function CryptoToolView() {
   }
 
   return (
-    <div>
-      <label>
+    <div className="crypto">
+      <label className="crypto__protocol">
         协议{' '}
         <select
           aria-label="协议"
@@ -57,18 +57,26 @@ export default function CryptoToolView() {
 
       {isEncoding ? (
         <>
-          <textarea
-            aria-label="输入"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            rows={6}
-          />
-          <div>
-            <button onClick={runEncode}>编码</button>
-            <button onClick={runDecode}>解码</button>
+          <div className="crypto__group">
+            <span className="crypto__legend">输入</span>
+            <textarea
+              aria-label="输入"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              rows={6}
+            />
+            <div className="crypto__actions">
+              <button onClick={runEncode}>编码</button>
+              <button onClick={runDecode}>解码</button>
+            </div>
           </div>
           {err && <ErrorView message={err} />}
-          {out && <pre aria-label="输出">{out}</pre>}
+          {out && (
+            <div className="crypto__group">
+              <span className="crypto__legend">输出</span>
+              <pre aria-label="输出">{out}</pre>
+            </div>
+          )}
         </>
       ) : (
         <AesForm mode={protocol.replace('AES-', '') as 'ECB' | 'CBC' | 'GCM'} />
