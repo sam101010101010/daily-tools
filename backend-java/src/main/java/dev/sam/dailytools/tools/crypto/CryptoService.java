@@ -3,7 +3,10 @@ package dev.sam.dailytools.tools.crypto;
 import dev.sam.dailytools.common.ToolException;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -43,9 +46,21 @@ public class CryptoService {
       byte[] out = cipher.doFinal(inputBytes);
       String ivEcho = iv == null ? "" : ByteCodec.encode(iv, orDefault(req.ivEnc(), "hex"));
       return new CryptoResult(ByteCodec.encode(out, outputEnc), ivEcho);
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+      // Unknown mode/padding string — a caller mistake, not a server fault. Never echo the raw
+      // JCE message (it names the attempted transformation); report the offending values only.
+      throw new ToolException("VALIDATION_ERROR", "未知的加密模式或填充：" + req.mode() + "/" + req.padding());
+    } catch (IllegalBlockSizeException | BadPaddingException e) {
+      if (encrypt) {
+        // On encrypt this is only reachable via NoPadding with a non-block-multiple input.
+        throw new ToolException("VALIDATION_ERROR", "NoPadding 模式下输入长度须为 16 字节整数倍");
+      }
+      // Every decrypt failure — wrong key, wrong IV, corrupted ciphertext, GCM tag mismatch —
+      // collapses to one code and one message: no padding oracle (ADR-0007).
+      throw new ToolException("DECRYPT_FAILED", "解密失败：密钥、IV 或密文不匹配");
     } catch (GeneralSecurityException e) {
-      // Failure classification (DECRYPT_FAILED / VALIDATION_ERROR) is refined in T3; keep it
-      // non-revealing for now rather than leaking the raw JCE exception message.
+      // Backstop for anything unclassified; the global handler renders a constant INTERNAL_ERROR
+      // message. Still never leaks the raw JCE text.
       throw new ToolException("INTERNAL_ERROR", "加解密失败");
     }
   }

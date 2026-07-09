@@ -160,6 +160,74 @@ class CryptoServiceTest {
         .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
   }
 
+  // --- error classification + sanitising (T3) ---
+  // Decryption failures collapse to one DECRYPT_FAILED code (no padding oracle); caller/config
+  // mistakes are VALIDATION_ERROR; raw JCE messages never surface.
+
+  @Test
+  void transform_rejects_wrong_key_length_as_validation_error() {
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("encrypt").mode("ECB").padding("PKCS5Padding")
+        .keySource("raw").key("123456789012345").keyEnc("utf8") // 15 bytes
+        .input("hi").inputEnc("utf8").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
+  @Test
+  void gcm_tampered_ciphertext_is_decrypt_failed() {
+    Req base = new Req().mode("GCM").padding("NoPadding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .iv("000102030405060708090a0b").ivEnc("hex");
+    CryptoResult enc = service.transform(base.copy().op("encrypt")
+        .input("secret payload").inputEnc("utf8").outputEnc("hex").build());
+    char[] c = enc.output().toCharArray();
+    c[0] = (c[0] == '0') ? '1' : '0'; // flip the first ciphertext byte -> GCM tag mismatch
+    String tampered = new String(c);
+    assertThatThrownBy(() -> service.transform(base.copy().op("decrypt")
+        .input(tampered).inputEnc("hex").outputEnc("utf8").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("DECRYPT_FAILED"));
+  }
+
+  @Test
+  void cbc_wrong_key_decrypt_is_decrypt_failed() {
+    CryptoResult enc = service.transform(new Req()
+        .op("encrypt").mode("CBC").padding("PKCS5Padding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .iv("00112233445566778899aabbccddeeff").ivEnc("hex")
+        .input("hello, 世界").inputEnc("utf8").outputEnc("base64").build());
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("decrypt").mode("CBC").padding("PKCS5Padding")
+        .key("fedcba9876543210").keyEnc("utf8")          // wrong key -> bad PKCS5 padding
+        .iv("00112233445566778899aabbccddeeff").ivEnc("hex")
+        .input(enc.output()).inputEnc("base64").outputEnc("utf8").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("DECRYPT_FAILED"));
+  }
+
+  @Test
+  void encrypt_nopadding_non_block_multiple_is_validation_error() {
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("encrypt").mode("ECB").padding("NoPadding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .input("0102030405").inputEnc("hex")            // 5 bytes, not a 16B multiple
+        .outputEnc("hex").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
+  @Test
+  void unknown_mode_is_validation_error() {
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("encrypt").mode("XTS").padding("NoPadding")
+        .key("0123456789abcdef").keyEnc("utf8")
+        .input("00112233445566778899aabbccddeeff").inputEnc("hex")
+        .outputEnc("hex").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
   // --- ByteCodec ---
 
   @Test
