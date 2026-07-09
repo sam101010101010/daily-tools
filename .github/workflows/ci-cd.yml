@@ -22,6 +22,12 @@ jobs:
   backend-test:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend-java } }
+    env:
+      # Dummy exercises the value-agnostic preset round-trip pin (functional coverage without the real
+      # KEY). The two ciphertext-fidelity pins stay gated on _REAL and skip — unless the real KEY is set
+      # as a secret, which also flips _REAL=1 so they run in CI too (see CryptoServiceTest).
+      CRYPTO_PRESET_TAPDATA_KEY: ${{ secrets.CRYPTO_PRESET_TAPDATA_KEY || 'ci-dummy-not-the-real-tapdata-key' }}
+      CRYPTO_PRESET_TAPDATA_KEY_REAL: ${{ secrets.CRYPTO_PRESET_TAPDATA_KEY != '' && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

@@ -2,6 +2,9 @@ import { expect, test, beforeEach, afterEach } from 'vitest';
 import type { ToolMeta } from './types';
 import { searchTools, getTool, tools } from './index';
 
+// Snapshot the real registry at import time — beforeEach swaps `tools` for `sample` below.
+const registry = [...tools];
+
 const sample: ToolMeta[] = [
   { id: 'json', name: 'JSON 工具', description: '格式化校验', category: '格式化', keywords: ['json', 'format'], load: async () => ({ default: () => null }) },
   { id: 'ssl', name: 'SSL 检查', description: '证书', category: '网络', keywords: ['tls', 'cert'], load: async () => ({ default: () => null }), backend: '/api/java/ssl' },
@@ -27,4 +30,14 @@ test('matches by name, keyword, and category (case-insensitive)', () => {
 test('getTool resolves by id', () => {
   expect(getTool('ssl')?.name).toBe('SSL 检查');
   expect(getTool('nope')).toBeUndefined();
+});
+
+test('crypto tool is a single registry entry with a backend; base64 is merged in', () => {
+  const crypto = registry.filter(t => t.id === 'crypto');
+  expect(crypto).toHaveLength(1);
+  expect(crypto[0].backend).toBe('/api/java/crypto');
+  expect(crypto[0].keywords).toContain('base64'); // search still hits "base64"
+  expect(registry.some(t => t.id === 'base64')).toBe(false);
+  const ids = registry.map(t => t.id);
+  expect(new Set(ids).size).toBe(ids.length); // ids unique
 });

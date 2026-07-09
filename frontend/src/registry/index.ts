@@ -1,12 +1,12 @@
 import type { ToolMeta } from './types';
 import { jsonMeta } from '../tools/json/meta';
-import { base64Meta } from '../tools/base64/meta';
+import { cryptoMeta } from '../tools/crypto/meta';
 import { sslMeta } from '../tools/ssl/meta';
 import { dnsMeta } from '../tools/dns/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
-  base64Meta,
+  cryptoMeta,
   sslMeta,
   dnsMeta,
 ];
