@@ -322,6 +322,41 @@ class CryptoServiceTest {
     assertThat(dec.output()).isEqualTo("root123");
   }
 
+  // --- named presets (T9) ---
+  // The tapdata passphrase lives only in CRYPTO_PRESET_TAPDATA_KEY; preset tests needing it are
+  // env-gated (skipped when unset), same as the T1 pin. The unknown-preset path needs no key.
+
+  @Test
+  void unknown_preset_is_validation_error() {
+    assertThatThrownBy(() -> service.transform(new Req()
+        .op("encrypt").keySource("preset").preset("no-such-preset")
+        .input("root123").inputEnc("utf8").outputEnc("hex").build()))
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
+  @Test
+  @EnabledIfEnvironmentVariable(named = "CRYPTO_PRESET_TAPDATA_KEY", matches = ".+")
+  void tapdata_preset_encrypt_decrypt_roundtrips() {
+    CryptoResult enc = service.transform(new Req()
+        .op("encrypt").keySource("preset").preset("tapdata")
+        .input("hello 世界").inputEnc("utf8").outputEnc("hex").build());
+    CryptoResult dec = service.transform(new Req()
+        .op("decrypt").keySource("preset").preset("tapdata")
+        .input(enc.output()).inputEnc("hex").outputEnc("utf8").build());
+    assertThat(dec.output()).isEqualTo("hello 世界");
+  }
+
+  // Locks "preset tapdata == AES256Util": same magic constant as the T1 explicit-passphrase pin.
+  @Test
+  @EnabledIfEnvironmentVariable(named = "CRYPTO_PRESET_TAPDATA_KEY", matches = ".+")
+  void tapdata_preset_reproduces_aes256util_ciphertext() {
+    CryptoResult enc = service.transform(new Req()
+        .op("encrypt").keySource("preset").preset("tapdata")
+        .input("root123").inputEnc("utf8").outputEnc("hex").build());
+    assertThat(enc.output()).isEqualTo("414932aaef43ec67ab32846f090bc033");
+  }
+
   /** Fluent builder for the 13-field {@link CryptoRequest}; keeps each test to the fields it cares about. */
   private static final class Req {
     private String op = "encrypt", mode = "ECB", padding = "PKCS5Padding";
@@ -336,6 +371,7 @@ class CryptoServiceTest {
     Req padding(String v) { padding = v; return this; }
     Req keySource(String v) { keySource = v; return this; }
     Req keyHash(String v) { keyHash = v; return this; }
+    Req preset(String v) { preset = v; return this; }
     Req key(String v) { key = v; return this; }
     Req keyEnc(String v) { keyEnc = v; return this; }
     Req iv(String v) { iv = v; return this; }

@@ -26,22 +26,33 @@ public class CryptoService {
 
   public CryptoResult transform(CryptoRequest req) {
     boolean encrypt = !"decrypt".equals(req.op());
-    byte[] keyBytes = resolveKey(req);
-    byte[] iv = resolveIv(req); // null for ECB; validated 16B (CBC) / 12B (GCM) otherwise
-    String inputEnc = orDefault(req.inputEnc(), encrypt ? "utf8" : "base64");
-    String outputEnc = orDefault(req.outputEnc(), encrypt ? "base64" : "utf8");
+
+    // A named preset overrides mode/padding/key from a backend-only passphrase (ADR-0007 D7); the
+    // frontend sends only the preset name. Everything else flows through the normal request fields.
+    boolean preset = "preset".equals(req.keySource());
+    CryptoPresets.Preset p = preset ? requirePreset(req.preset()) : null;
+
+    String mode = preset ? p.mode() : req.mode();
+    // GCM is an AEAD stream mode; padding is meaningless and forced to NoPadding.
+    String padding = "GCM".equals(mode) ? "NoPadding" : (preset ? p.padding() : req.padding());
+    byte[] keyBytes = preset
+        ? validateKeyLength(digest(p.keyHash(), ByteCodec.decode(p.passphrase(), "utf8")))
+        : resolveKey(req);
+    byte[] iv = resolveIv(mode, req); // null for ECB; validated 16B (CBC) / 12B (GCM) otherwise
+
+    // Presets follow the legacy scheme (hex ciphertext); raw/hash default to base64.
+    String inputEnc = orDefault(req.inputEnc(), encrypt ? "utf8" : (preset ? "hex" : "base64"));
+    String outputEnc = orDefault(req.outputEnc(), encrypt ? (preset ? "hex" : "base64") : "utf8");
     byte[] inputBytes = ByteCodec.decode(req.input(), inputEnc);
     try {
-      // GCM is an AEAD stream mode; padding is meaningless and forced to NoPadding.
-      String padding = "GCM".equals(req.mode()) ? "NoPadding" : req.padding();
-      Cipher cipher = Cipher.getInstance("AES/" + req.mode() + "/" + padding);
+      Cipher cipher = Cipher.getInstance("AES/" + mode + "/" + padding);
       SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
       int cipherMode = encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE;
-      switch (req.mode()) {
+      switch (mode) {
         case "ECB" -> cipher.init(cipherMode, keySpec);
         case "CBC" -> cipher.init(cipherMode, keySpec, new IvParameterSpec(iv));
         case "GCM" -> cipher.init(cipherMode, keySpec, new GCMParameterSpec(GCM_TAG_BITS, iv));
-        default -> throw new ToolException("VALIDATION_ERROR", "未知加密模式：" + req.mode());
+        default -> throw new ToolException("VALIDATION_ERROR", "未知加密模式：" + mode);
       }
       byte[] out = cipher.doFinal(inputBytes);
       String ivEcho = iv == null ? "" : ByteCodec.encode(iv, orDefault(req.ivEnc(), "hex"));
@@ -49,7 +60,7 @@ public class CryptoService {
     } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
       // Unknown mode/padding string — a caller mistake, not a server fault. Never echo the raw
       // JCE message (it names the attempted transformation); report the offending values only.
-      throw new ToolException("VALIDATION_ERROR", "未知的加密模式或填充：" + req.mode() + "/" + req.padding());
+      throw new ToolException("VALIDATION_ERROR", "未知的加密模式或填充：" + mode + "/" + padding);
     } catch (IllegalBlockSizeException | BadPaddingException e) {
       if (encrypt) {
         // On encrypt this is only reachable via NoPadding with a non-block-multiple input.
@@ -70,8 +81,8 @@ public class CryptoService {
    * CBC needs a 16-byte IV, GCM needs a 12-byte nonce. A missing or wrong-length value is a
    * {@code VALIDATION_ERROR} — surfaced before {@link Cipher#init} so it can't leak as INTERNAL_ERROR.
    */
-  private static byte[] resolveIv(CryptoRequest req) {
-    int required = switch (req.mode()) {
+  private static byte[] resolveIv(String mode, CryptoRequest req) {
+    int required = switch (mode) {
       case "CBC" -> 16;
       case "GCM" -> 12;
       default -> -1; // ECB (and anything else) carries no IV here
@@ -79,7 +90,7 @@ public class CryptoService {
     if (required < 0) {
       return null;
     }
-    String label = "GCM".equals(req.mode()) ? "GCM nonce" : "CBC IV";
+    String label = "GCM".equals(mode) ? "GCM nonce" : "CBC IV";
     if (req.iv() == null || req.iv().isEmpty()) {
       throw new ToolException("VALIDATION_ERROR", label + "（" + required + " 字节）未提供");
     }
@@ -102,11 +113,24 @@ public class CryptoService {
       case "hash" -> digest(req.keyHash(), ByteCodec.decode(req.key(), orDefault(req.keyEnc(), "utf8")));
       default -> throw new ToolException("VALIDATION_ERROR", "未知密钥来源：" + req.keySource());
     };
+    return validateKeyLength(key);
+  }
+
+  private static byte[] validateKeyLength(byte[] key) {
     if (key.length != 16 && key.length != 24 && key.length != 32) {
       throw new ToolException("VALIDATION_ERROR",
           "密钥长度必须为 16/24/32 字节（AES-128/192/256），当前 " + key.length);
     }
     return key;
+  }
+
+  private static CryptoPresets.Preset requirePreset(String name) {
+    CryptoPresets.Preset p = CryptoPresets.get(name);
+    if (p == null) {
+      // Unknown name, or a known preset whose passphrase env var is unset — same non-revealing code.
+      throw new ToolException("VALIDATION_ERROR", "未知或不可用的预设：" + name);
+    }
+    return p;
   }
 
   private static byte[] digest(String algo, byte[] data) {
