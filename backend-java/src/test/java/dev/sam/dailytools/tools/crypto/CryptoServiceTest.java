@@ -302,11 +302,14 @@ class CryptoServiceTest {
   }
 
   // --- tapdata AES256Util byte-level replica (golden contract) ---
-  // The passphrase is the AES256Util KEY constant and must never live in this repo. The test is
-  // wired but runs only when CRYPTO_PRESET_TAPDATA_KEY is injected into the env (CI secret or a
-  // local export); otherwise it is skipped. Pin: MD5(KEY) -> AES-128/ECB/PKCS5, Encode("root123").
+  // Fidelity pin: asserts the exact AES256Util ciphertext, which only the genuine KEY can produce, so
+  // it is double-gated — it runs only when BOTH CRYPTO_PRESET_TAPDATA_KEY holds the real KEY AND
+  // CRYPTO_PRESET_TAPDATA_KEY_REAL=1 marks it genuine (a CI secret job or a one-time local run).
+  // A dummy CRYPTO_PRESET_TAPDATA_KEY (used by CI to exercise the round-trip pin) leaves _REAL unset,
+  // so this pin skips instead of failing. Pin: MD5(KEY) -> AES-128/ECB/PKCS5, Encode("root123").
   @Test
   @EnabledIfEnvironmentVariable(named = "CRYPTO_PRESET_TAPDATA_KEY", matches = ".+")
+  @EnabledIfEnvironmentVariable(named = "CRYPTO_PRESET_TAPDATA_KEY_REAL", matches = "1")
   void aes256util_real_ciphertext_pin() {
     String passphrase = System.getenv("CRYPTO_PRESET_TAPDATA_KEY");
     CryptoResult enc = service.transform(new Req()
@@ -323,8 +326,10 @@ class CryptoServiceTest {
   }
 
   // --- named presets (T9) ---
-  // The tapdata passphrase lives only in CRYPTO_PRESET_TAPDATA_KEY; preset tests needing it are
-  // env-gated (skipped when unset), same as the T1 pin. The unknown-preset path needs no key.
+  // The tapdata passphrase lives only in CRYPTO_PRESET_TAPDATA_KEY. The round-trip pin below is
+  // value-agnostic: it runs whenever the var is set (a dummy is enough — that is how CI exercises the
+  // preset wiring without the real KEY). The ciphertext-fidelity pin is additionally gated on
+  // CRYPTO_PRESET_TAPDATA_KEY_REAL=1 (real KEY only), so a dummy skips it. Unknown-preset needs no key.
 
   @Test
   void unknown_preset_is_validation_error() {
@@ -348,8 +353,10 @@ class CryptoServiceTest {
   }
 
   // Locks "preset tapdata == AES256Util": same magic constant as the T1 explicit-passphrase pin.
+  // Fidelity pin — double-gated on the real KEY (see aes256util_real_ciphertext_pin).
   @Test
   @EnabledIfEnvironmentVariable(named = "CRYPTO_PRESET_TAPDATA_KEY", matches = ".+")
+  @EnabledIfEnvironmentVariable(named = "CRYPTO_PRESET_TAPDATA_KEY_REAL", matches = "1")
   void tapdata_preset_reproduces_aes256util_ciphertext() {
     CryptoResult enc = service.transform(new Req()
         .op("encrypt").keySource("preset").preset("tapdata")

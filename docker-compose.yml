@@ -2,6 +2,10 @@ services:
   backend-java:
     build: { context: ., dockerfile: backend-java/Dockerfile }
     expose: ["8080"]
+    environment:
+      # tapdata preset passphrase; unset -> preset unavailable (VALIDATION_ERROR). Value from host
+      # env / a gitignored .env, never committed or baked into an image layer (ADR-0007 D7).
+      - CRYPTO_PRESET_TAPDATA_KEY=${CRYPTO_PRESET_TAPDATA_KEY:-}
   web:
     build: { context: ., dockerfile: frontend/Dockerfile }
     environment:
