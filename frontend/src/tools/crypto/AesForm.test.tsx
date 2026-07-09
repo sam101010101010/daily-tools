@@ -48,3 +48,26 @@ test('choosing password-hash key source reveals the hash algorithm select', asyn
   await userEvent.selectOptions(screen.getByLabelText('密钥来源'), 'hash');
   expect(screen.getByLabelText('哈希算法')).toBeInTheDocument();
 });
+
+test('typing a preset name enters preset mode and submits a passphrase-free request', async () => {
+  render(<AesForm mode="CBC" />);
+  await userEvent.type(screen.getByLabelText('密钥'), 'tapdata');
+  expect(screen.getByText(/已套用 tapdata 预设/)).toBeInTheDocument();
+  expect(screen.getByLabelText('填充')).toBeDisabled(); // preset locks the scheme
+  await userEvent.type(screen.getByLabelText('输入'), 'root123');
+  await userEvent.click(screen.getByRole('button', { name: '加密' }));
+  const body = vi.mocked(callTool).mock.calls[0][1] as Record<string, unknown>;
+  expect(body).toMatchObject({ op: 'encrypt', keySource: 'preset', preset: 'tapdata' });
+  expect(body.key).toBeUndefined();       // the passphrase is never sent
+  expect(body.mode).toBeUndefined();       // backend derives mode/padding from the preset
+});
+
+test('changing the key away from a preset name exits preset mode', async () => {
+  render(<AesForm mode="CBC" />);
+  await userEvent.type(screen.getByLabelText('密钥'), 'tapdata');
+  expect(screen.getByText(/已套用 tapdata 预设/)).toBeInTheDocument();
+  await userEvent.clear(screen.getByLabelText('密钥'));
+  await userEvent.type(screen.getByLabelText('密钥'), 'abc');
+  expect(screen.queryByText(/已套用 tapdata 预设/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText('填充')).not.toBeDisabled(); // scheme selectable again
+});

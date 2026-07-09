@@ -10,6 +10,13 @@ interface CryptoResult {
 type Enc = 'utf8' | 'hex' | 'base64';
 const ENCS: Enc[] = ['utf8', 'hex', 'base64'];
 
+// Non-secret preset config — algorithm shape only. The passphrase is secret and lives on the
+// backend (CryptoPresets); typing a preset name in the key field applies it and the request sends
+// only the name, never a passphrase.
+const PRESETS: Record<string, { mode: string; padding: string; keySource: string; keyHash: string }> = {
+  tapdata: { mode: 'ECB', padding: 'PKCS5Padding', keySource: 'hash', keyHash: 'MD5' },
+};
+
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -56,8 +63,12 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
   const [loading, setLoading] = useState(false);
 
   const isHash = keySource === 'hash';
-  const keyLabel = isHash ? '口令' : '密钥';
-  const effectivePadding = isGcm ? 'NoPadding' : padding;
+  const keyLabel = isHash ? '口令' : '密钥'; // follows the key-source select, not the preset
+  // A key that is exactly a preset name switches the form into preset mode.
+  const activePreset = PRESETS[key];
+  const locked = !!activePreset;
+  const effectivePadding = isGcm ? 'NoPadding' : (activePreset ? activePreset.padding : padding);
+  const showIv = hasIv && !locked;
 
   function genIv() {
     const bytes = new Uint8Array(isGcm ? 12 : 16);
@@ -67,13 +78,17 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
 
   async function run(op: 'encrypt' | 'decrypt') {
     setLoading(true); setErr(''); setOutput(''); setIvEcho('');
-    const body = {
-      op, mode, padding: effectivePadding,
-      keySource, keyHash: isHash ? keyHash : undefined,
-      key, keyEnc,
-      iv: hasIv ? iv : undefined, ivEnc: hasIv ? ivEnc : undefined,
-      input, inputEnc, outputEnc,
-    };
+    // Preset mode sends only the name — the backend supplies passphrase/mode/padding. Otherwise
+    // build the full CryptoRequest from the form fields.
+    const body = activePreset
+      ? { op, keySource: 'preset', preset: key, input, inputEnc, outputEnc }
+      : {
+          op, mode, padding: effectivePadding,
+          keySource, keyHash: isHash ? keyHash : undefined,
+          key, keyEnc,
+          iv: hasIv ? iv : undefined, ivEnc: hasIv ? ivEnc : undefined,
+          input, inputEnc, outputEnc,
+        };
     const res = await callTool<CryptoResult>('/api/java/crypto', body);
     setLoading(false);
     if (res.ok) { setOutput(res.data.output); setIvEcho(res.data.iv); }
@@ -85,7 +100,7 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
       {mode === 'ECB' && <p className="crypto-warn">⚠️ ECB 不安全，仅供兼容旧系统</p>}
 
       <label>填充{' '}
-        <select aria-label="填充" value={effectivePadding} disabled={isGcm}
+        <select aria-label="填充" value={effectivePadding} disabled={isGcm || locked}
                 onChange={e => setPadding(e.target.value)}>
           <option value="PKCS5Padding">PKCS5Padding</option>
           <option value="NoPadding">NoPadding</option>
@@ -93,7 +108,8 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
       </label>
 
       <label>密钥来源{' '}
-        <select aria-label="密钥来源" value={keySource} onChange={e => setKeySource(e.target.value)}>
+        <select aria-label="密钥来源" value={keySource} disabled={locked}
+                onChange={e => setKeySource(e.target.value)}>
           <option value="raw">直接密钥</option>
           <option value="hash">口令哈希</option>
         </select>
@@ -110,9 +126,14 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
       <label>{keyLabel}{' '}
         <input aria-label={keyLabel} value={key} onChange={e => setKey(e.target.value)} />
       </label>
+      {locked && (
+        <p className="crypto-preset-badge">
+          🔑 已套用 {key} 预设（内置密钥，仅供联调）· AES-{activePreset.mode}/{activePreset.padding}/{activePreset.keyHash}
+        </p>
+      )}
       <EncSelect label="密钥编码" value={keyEnc} onChange={setKeyEnc} />
 
-      {hasIv && (
+      {showIv && (
         <div>
           <label>IV{' '}
             <input aria-label="IV" value={iv} onChange={e => setIv(e.target.value)} />
