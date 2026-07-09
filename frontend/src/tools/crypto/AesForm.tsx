@@ -98,72 +98,90 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
   }
 
   return (
-    <div>
+    <div className="crypto">
       {mode === 'ECB' && <p className="crypto-warn">⚠️ ECB 不安全，仅供兼容旧系统</p>}
 
-      <label>填充{' '}
-        <select aria-label="填充" value={effectivePadding} disabled={isGcm || locked}
-                onChange={e => setPadding(e.target.value)}>
-          <option value="PKCS5Padding">PKCS5Padding</option>
-          <option value="NoPadding">NoPadding</option>
-        </select>
-      </label>
+      <div className="crypto__group">
+        <span className="crypto__legend">选项</span>
 
-      <label>密钥来源{' '}
-        <select aria-label="密钥来源" value={keySource} disabled={locked}
-                onChange={e => setKeySource(e.target.value)}>
-          <option value="raw">直接密钥</option>
-          <option value="hash">口令哈希</option>
-        </select>
-      </label>
-      {isHash && (
-        <label>哈希算法{' '}
-          <select aria-label="哈希算法" value={keyHash} onChange={e => setKeyHash(e.target.value)}>
-            <option value="MD5">MD5 → AES-128</option>
-            <option value="SHA-256">SHA-256 → AES-256</option>
-          </select>
-        </label>
-      )}
-
-      <label>{keyLabel}{' '}
-        <input aria-label={keyLabel} value={key} onChange={e => setKey(e.target.value)} />
-      </label>
-      {locked && (
-        <p className="crypto-preset-badge">
-          🔑 已套用 {key} 预设（内置密钥，仅供联调）· AES-{activePreset.mode}/{activePreset.padding}/{activePreset.keyHash}
-        </p>
-      )}
-      <EncSelect label="密钥编码" value={keyEnc} onChange={setKeyEnc} />
-
-      {showIv && (
-        <div>
-          <label>IV{' '}
-            <input aria-label="IV" value={iv} onChange={e => setIv(e.target.value)} />
+        <div className="crypto__row">
+          <label>填充{' '}
+            <select aria-label="填充" value={effectivePadding} disabled={isGcm || locked}
+                    onChange={e => setPadding(e.target.value)}>
+              <option value="PKCS5Padding">PKCS5Padding</option>
+              <option value="NoPadding">NoPadding</option>
+            </select>
           </label>
-          <EncSelect label="IV 编码" value={ivEnc} onChange={setIvEnc} />
-          <button type="button" onClick={genIv}>生成随机 IV</button>
+
+          <label>密钥来源{' '}
+            <select aria-label="密钥来源" value={keySource} disabled={locked}
+                    onChange={e => setKeySource(e.target.value)}>
+              <option value="raw">直接密钥</option>
+              <option value="hash">口令哈希</option>
+            </select>
+          </label>
+          {isHash && (
+            <label>哈希算法{' '}
+              <select aria-label="哈希算法" value={keyHash} onChange={e => setKeyHash(e.target.value)}>
+                <option value="MD5">MD5 → AES-128</option>
+                <option value="SHA-256">SHA-256 → AES-256</option>
+              </select>
+            </label>
+          )}
         </div>
-      )}
 
-      <label>输入{' '}
-        <textarea aria-label="输入" value={input} onChange={e => setInput(e.target.value)} rows={4} />
-      </label>
-      {/* In preset mode the backend fixes the encodings per op, so these selects would mislead. */}
-      {!locked && <EncSelect label="输入编码" value={inputEnc} onChange={setInputEnc} />}
-      {!locked && <EncSelect label="输出编码" value={outputEnc} onChange={setOutputEnc} />}
+        <div className="crypto__row">
+          <label className="crypto__field">{keyLabel}{' '}
+            <input aria-label={keyLabel} value={key} onChange={e => setKey(e.target.value)} />
+          </label>
+          <EncSelect label="密钥编码" value={keyEnc} onChange={setKeyEnc} />
+        </div>
+        {locked && (
+          <p className="crypto-preset-badge">
+            🔑 已套用 {key} 预设（内置密钥，仅供联调）· AES-{activePreset.mode}/{activePreset.padding}/{activePreset.keyHash}
+          </p>
+        )}
 
-      <div>
-        <button onClick={() => run('encrypt')} disabled={loading || !key || !input}>加密</button>
-        <button onClick={() => run('decrypt')} disabled={loading || !key || !input}>解密</button>
+        {showIv && (
+          <div className="crypto__row">
+            <label className="crypto__field">IV{' '}
+              <input aria-label="IV" value={iv} onChange={e => setIv(e.target.value)} />
+            </label>
+            <EncSelect label="IV 编码" value={ivEnc} onChange={setIvEnc} />
+            <button type="button" onClick={genIv}>生成随机 IV</button>
+          </div>
+        )}
       </div>
 
-      {loading && <p>处理中…</p>}
+      <div className="crypto__group">
+        <span className="crypto__legend">输入</span>
+        <textarea aria-label="输入" value={input} onChange={e => setInput(e.target.value)} rows={4} />
+        {/* In preset mode the backend fixes the encodings per op, so these selects would mislead. */}
+        {!locked && (
+          <div className="crypto__row">
+            <EncSelect label="输入编码" value={inputEnc} onChange={setInputEnc} />
+            <EncSelect label="输出编码" value={outputEnc} onChange={setOutputEnc} />
+          </div>
+        )}
+        <div className="crypto__actions">
+          <button onClick={() => run('encrypt')} disabled={loading || !key || !input}>加密</button>
+          <button onClick={() => run('decrypt')} disabled={loading || !key || !input}>解密</button>
+        </div>
+      </div>
+
+      {loading && <p className="crypto__status">处理中…</p>}
       {err && <ErrorView message={err} />}
-      {output && <pre aria-label="输出">{output}</pre>}
-      {ivEcho && (
-        <label>本次 IV{' '}
-          <input aria-label="回显 IV" readOnly value={ivEcho} />
-        </label>
+
+      {(output || ivEcho) && (
+        <div className="crypto__group">
+          <span className="crypto__legend">输出</span>
+          {output && <pre aria-label="输出">{output}</pre>}
+          {ivEcho && (
+            <label className="crypto__field">本次 IV{' '}
+              <input aria-label="回显 IV" readOnly value={ivEcho} />
+            </label>
+          )}
+        </div>
       )}
     </div>
   );
