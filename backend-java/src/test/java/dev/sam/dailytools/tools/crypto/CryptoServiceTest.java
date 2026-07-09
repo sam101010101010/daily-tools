@@ -352,6 +352,18 @@ class CryptoServiceTest {
     assertThat(dec.output()).isEqualTo("hello 世界");
   }
 
+  // The preset UI submits no inputEnc/outputEnc, relying on the backend's per-op legacy-hex defaults
+  // (encrypt utf8->hex, decrypt hex->utf8). Lock that so the one-click round-trip can't regress.
+  @Test
+  @EnabledIfEnvironmentVariable(named = "CRYPTO_PRESET_TAPDATA_KEY", matches = ".+")
+  void tapdata_preset_roundtrips_with_default_encodings() {
+    CryptoResult enc = service.transform(new Req()
+        .op("encrypt").keySource("preset").preset("tapdata").input("root123").build());
+    CryptoResult dec = service.transform(new Req()
+        .op("decrypt").keySource("preset").preset("tapdata").input(enc.output()).build());
+    assertThat(dec.output()).isEqualTo("root123");
+  }
+
   // Locks "preset tapdata == AES256Util": same magic constant as the T1 explicit-passphrase pin.
   // Fidelity pin — double-gated on the real KEY (see aes256util_real_ciphertext_pin).
   @Test
