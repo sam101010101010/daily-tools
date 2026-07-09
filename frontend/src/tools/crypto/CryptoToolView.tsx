@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { encodeBase64, decodeBase64, encodeHex, decodeHex } from './codec';
 import { ErrorView } from '../../components/ErrorView';
+import AesForm from './AesForm';
 
 const ENCODING_PROTOCOLS = ['base64', 'base64-url', 'hex'];
 
@@ -70,8 +71,7 @@ export default function CryptoToolView() {
           {out && <pre aria-label="输出">{out}</pre>}
         </>
       ) : (
-        // The symmetric encrypt/decrypt form is added in T7.
-        <p aria-label="加密表单占位">（AES 对称加解密表单）</p>
+        <AesForm mode={protocol.replace('AES-', '') as 'ECB' | 'CBC' | 'GCM'} />
       )}
     </div>
   );
