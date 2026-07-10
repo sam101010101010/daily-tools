@@ -17,9 +17,6 @@ import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -60,7 +57,12 @@ public class SslService {
 
       socket.startHandshake();
       Certificate[] chain = socket.getSession().getPeerCertificates();
-      return describe((X509Certificate) chain[0]);
+      // Interim: the tool still returns the leaf as SslCertInfo; T6 rewrites inspect() to build
+      // the full SslReport (whole chain + verdict + protocol matrix) from ChainDescriber & friends.
+      CertDetail leaf = ChainDescriber.describe((X509Certificate) chain[0]);
+      return new SslCertInfo(
+          leaf.subjectDN(), leaf.issuerDN(), leaf.notBefore(), leaf.notAfter(),
+          leaf.expired(), leaf.daysUntilExpiry(), leaf.sans(), leaf.serialNumber());
     } catch (IOException e) {
       throw new ToolException("SSL_HANDSHAKE_FAILED", "无法连接或握手失败：" + host + ":" + port);
     }
@@ -107,24 +109,5 @@ public class SslService {
     } catch (GeneralSecurityException | IOException e) {
       throw new ToolException("SSL_HANDSHAKE_FAILED", "无法初始化 SSL 上下文：" + e.getMessage());
     }
-  }
-
-  SslCertInfo describe(X509Certificate cert) {
-    Instant notAfter = cert.getNotAfter().toInstant();
-    long days = Duration.between(Instant.now(), notAfter).toDays();
-    List<String> sans = new ArrayList<>();
-    try {
-      var entries = cert.getSubjectAlternativeNames();
-      if (entries != null) for (List<?> e : entries) if (e.size() >= 2) sans.add(String.valueOf(e.get(1)));
-    } catch (Exception ignored) { }
-    return new SslCertInfo(
-        cert.getSubjectX500Principal().getName(),
-        cert.getIssuerX500Principal().getName(),
-        cert.getNotBefore().toInstant().toString(),
-        notAfter.toString(),
-        Instant.now().isAfter(notAfter),
-        days,
-        sans,
-        cert.getSerialNumber().toString());
   }
 }
