@@ -4,12 +4,8 @@ import dev.sam.dailytools.common.ToolException;
 import org.springframework.stereotype.Service;
 
 import javax.net.ssl.SNIHostName;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -21,27 +17,6 @@ import java.util.List;
 
 @Service
 public class SslService {
-
-  /**
-   * This inspector is a diagnostic tool: its job is to read and report whatever certificate a
-   * server presents (including expired / self-signed / mismatched ones), not to establish a
-   * secure channel. A trust-all TrustManager is therefore built and scoped to a single socket
-   * here — it is never installed as the JVM/global default and must not affect any other
-   * outbound TLS in the process.
-   */
-  private static final X509TrustManager TRUST_ALL =
-      new X509TrustManager() {
-        @Override
-        public void checkClientTrusted(X509Certificate[] chain, String authType) { }
-
-        @Override
-        public void checkServerTrusted(X509Certificate[] chain, String authType) { }
-
-        @Override
-        public X509Certificate[] getAcceptedIssuers() {
-          return new X509Certificate[0];
-        }
-      };
 
   public SslCertInfo inspect(String host, int port) {
     // SSRF guard: resolve up front, reject internal targets, then connect to the very
@@ -102,10 +77,7 @@ public class SslService {
 
   private SSLSocket createTrustAllSocket() {
     try {
-      SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, new TrustManager[] {TRUST_ALL}, null);
-      SSLSocketFactory factory = context.getSocketFactory();
-      return (SSLSocket) factory.createSocket();
+      return (SSLSocket) TrustAll.socketFactory().createSocket();
     } catch (GeneralSecurityException | IOException e) {
       throw new ToolException("SSL_HANDSHAKE_FAILED", "无法初始化 SSL 上下文：" + e.getMessage());
     }
