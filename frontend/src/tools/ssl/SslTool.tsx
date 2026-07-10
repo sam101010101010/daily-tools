@@ -33,6 +33,34 @@ function Badge({ tone, children }: { tone: BadgeTone; children: ReactNode }) {
   return <span className={`ssl__badge ssl__badge--${tone}`}>{children}</span>;
 }
 
+function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="ssl__cert">
+      <button className="ssl__cert-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span> {cert.subjectCN ?? cert.subjectDN}
+      </button>
+      {open && (
+        <dl className="ssl__cert-body">
+          <dt>Subject</dt>
+          <dd>{cert.subjectCN ?? cert.subjectDN}{cert.subjectO ? ` · ${cert.subjectO}` : ''}</dd>
+          <dt>Issuer</dt>
+          <dd>{cert.issuerCN ?? cert.issuerDN}{cert.issuerO ? ` · ${cert.issuerO}` : ''}</dd>
+          <dt>有效期</dt>
+          <dd>{cert.notBefore} → {cert.notAfter}（{cert.expired ? '已过期' : `剩 ${cert.daysUntilExpiry} 天`}）</dd>
+          <dt>公钥</dt>
+          <dd>{cert.keyAlgorithm}{cert.keySize ? ` ${cert.keySize} bit` : ''}</dd>
+          <dt>签名算法</dt>
+          <dd>{cert.signatureAlgorithm} {cert.weakSignature && <span className="ssl__weak-sig">弱签名</span>}</dd>
+          <dt>SHA-256 指纹</dt>
+          <dd className="ssl__fp">{cert.sha256Fingerprint}</dd>
+          {cert.sans.length > 0 && (<><dt>SAN</dt><dd>{cert.sans.join(', ')}</dd></>)}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 export default function SslTool() {
   const [host, setHost] = useState('');
   const [port, setPort] = useState('');
@@ -87,6 +115,33 @@ export default function SslTool() {
           </Badge>
           {v.selfSigned && <Badge tone="warn">⚠ 自签名</Badge>}
         </div>
+      )}
+
+      {report && (
+        <>
+          <p className="ssl__negotiated">
+            协商结果：{report.negotiated.version} · {report.negotiated.cipher}
+          </p>
+
+          {report.supportedProtocols.length > 0 && (
+            <table className="ssl__matrix">
+              <thead><tr><th>协议</th><th>支持</th><th></th></tr></thead>
+              <tbody>
+                {report.supportedProtocols.map(p => (
+                  <tr key={p.protocol}>
+                    <td>{p.protocol}</td>
+                    <td>{p.supported ? '✓' : '✗'}</td>
+                    <td>{p.weak && <span className="ssl__weak">弱</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <div className="ssl__chain">
+            {report.chain.map((c, i) => <CertCard key={i} cert={c} defaultOpen={i === 0} />)}
+          </div>
+        </>
       )}
     </div>
   );

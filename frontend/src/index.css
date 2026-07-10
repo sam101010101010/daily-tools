@@ -694,3 +694,30 @@ main section li {
 /* good verdict = the neutral base chip; bad = danger; caution (self-signed) = accent */
 .ssl__badge--bad { border-color: var(--danger); background: var(--danger-weak); color: var(--danger); }
 .ssl__badge--warn { border-color: var(--accent); background: var(--accent-weak); color: var(--accent-strong); }
+
+.ssl__negotiated { margin: 0.5rem 0; color: var(--text-muted); font-size: 0.9rem; }
+
+.ssl__matrix { border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.9rem; }
+.ssl__matrix th, .ssl__matrix td { padding: 0.3rem 0.9rem 0.3rem 0; text-align: left; }
+.ssl__matrix th { color: var(--text-muted); font-weight: 600; }
+/* weak protocol (TLSv1/1.1) = caution; weak signature (SHA1/MD5) = danger */
+.ssl__weak { color: var(--accent-strong); font-weight: 600; }
+.ssl__weak-sig { color: var(--danger); font-weight: 600; }
+
+.ssl__chain { display: flex; flex-direction: column; gap: 0.5rem; }
+.ssl__cert { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.ssl__cert-head {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ssl__cert-body { margin: 0; padding: 0 0.75rem 0.75rem; display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; font-size: 0.88rem; }
+.ssl__cert-body dt { color: var(--text-muted); }
+.ssl__cert-body dd { margin: 0; }
+.ssl__fp { font-family: var(--mono); font-size: 0.8rem; word-break: break-all; }
