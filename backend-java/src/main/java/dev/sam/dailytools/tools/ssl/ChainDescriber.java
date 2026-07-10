@@ -52,7 +52,7 @@ public final class ChainDescriber {
   }
 
   /** First value of RDN {@code type} (e.g. CN / O) in {@code dn}, or null if absent/malformed. */
-  private static String rdn(String dn, String type) {
+  static String rdn(String dn, String type) {
     try {
       for (Rdn rdn : new LdapName(dn).getRdns()) {
         if (rdn.getType().equalsIgnoreCase(type)) {
