@@ -8,9 +8,18 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * SSRF-guard contract and input validation for {@link SslService#inspect}. These all reject before
+ * any network I/O, so they stay offline. The real full-chain / verdict positive path is exercised
+ * only in the T10 docker-compose smoke to keep unit tests off the network.
+ */
 class SslServiceTest {
-  // Cert-field parsing (formerly SslService.describe) now lives in ChainDescriberTest, exercised
-  // against real fixed certificates. This class keeps the SSRF-guard contract.
+
+  private static void expectValidationError(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
+    assertThatThrownBy(call)
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
 
   @Test
   void isBlocked_true_for_internal_and_metadata_ranges() throws Exception {
@@ -33,8 +42,17 @@ class SslServiceTest {
 
   @Test
   void inspect_rejects_blocked_target_before_connecting() {
-    assertThatThrownBy(() -> new SslService().inspect("169.254.169.254", 443))
-        .isInstanceOf(ToolException.class)
-        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+    expectValidationError(() -> new SslService().inspect("169.254.169.254", 443, "none"));
+  }
+
+  @Test
+  void inspect_rejects_port_out_of_range() {
+    expectValidationError(() -> new SslService().inspect("example.com", 0, "none"));
+    expectValidationError(() -> new SslService().inspect("example.com", 70000, "none"));
+  }
+
+  @Test
+  void inspect_rejects_unknown_starttls() {
+    expectValidationError(() -> new SslService().inspect("example.com", 443, "ftp"));
   }
 }
