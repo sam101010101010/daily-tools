@@ -2,37 +2,23 @@ package dev.sam.dailytools.tools.ssl;
 
 import dev.sam.dailytools.common.ToolException;
 import org.junit.jupiter.api.Test;
-import javax.security.auth.x500.X500Principal;
-import java.math.BigInteger;
 import java.net.InetAddress;
-import java.security.cert.X509Certificate;
-import java.util.Date;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
 
+/**
+ * SSRF-guard contract and input validation for {@link SslService#inspect}. These all reject before
+ * any network I/O, so they stay offline. The real full-chain / verdict positive path is exercised
+ * only in the T10 docker-compose smoke to keep unit tests off the network.
+ */
 class SslServiceTest {
-  @Test
-  void describe_maps_cert_fields_and_flags_expiry() throws Exception {
-    X509Certificate cert = mock(X509Certificate.class);
-    when(cert.getSubjectX500Principal()).thenReturn(new X500Principal("CN=example.com"));
-    when(cert.getIssuerX500Principal()).thenReturn(new X500Principal("CN=Test CA"));
-    Date notAfter = new Date(System.currentTimeMillis() + 10L * 86400_000L);
-    when(cert.getNotBefore()).thenReturn(new Date(0));
-    when(cert.getNotAfter()).thenReturn(notAfter);
-    when(cert.getSerialNumber()).thenReturn(new BigInteger("123"));
-    when(cert.getSubjectAlternativeNames()).thenReturn(List.of(List.of(2, "example.com"), List.of(2, "www.example.com")));
 
-    SslCertInfo info = new SslService().describe(cert);
-
-    assertThat(info.subject()).contains("example.com");
-    assertThat(info.issuer()).contains("Test CA");
-    assertThat(info.expired()).isFalse();
-    assertThat(info.daysUntilExpiry()).isBetween(9L, 10L);
-    assertThat(info.sans()).containsExactly("example.com", "www.example.com");
-    assertThat(info.serialNumber()).isEqualTo("123");
+  private static void expectValidationError(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
+    assertThatThrownBy(call)
+        .isInstanceOf(ToolException.class)
+        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
   }
 
   @Test
@@ -56,8 +42,17 @@ class SslServiceTest {
 
   @Test
   void inspect_rejects_blocked_target_before_connecting() {
-    assertThatThrownBy(() -> new SslService().inspect("169.254.169.254", 443))
-        .isInstanceOf(ToolException.class)
-        .satisfies(e -> assertThat(((ToolException) e).getCode()).isEqualTo("VALIDATION_ERROR"));
+    expectValidationError(() -> new SslService().inspect("169.254.169.254", 443, "none"));
+  }
+
+  @Test
+  void inspect_rejects_port_out_of_range() {
+    expectValidationError(() -> new SslService().inspect("example.com", 0, "none"));
+    expectValidationError(() -> new SslService().inspect("example.com", 70000, "none"));
+  }
+
+  @Test
+  void inspect_rejects_unknown_starttls() {
+    expectValidationError(() -> new SslService().inspect("example.com", 443, "ftp"));
   }
 }

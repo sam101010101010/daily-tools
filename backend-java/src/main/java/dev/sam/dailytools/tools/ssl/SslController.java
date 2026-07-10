@@ -11,7 +11,7 @@ public class SslController {
   public SslController(SslService service) { this.service = service; }
 
   @PostMapping
-  public ApiEnvelope<SslCertInfo> check(@Valid @RequestBody SslRequest req) {
-    return ApiEnvelope.ok(service.inspect(req.host(), req.portOrDefault()));
+  public ApiEnvelope<SslReport> check(@Valid @RequestBody SslRequest req) {
+    return ApiEnvelope.ok(service.inspect(req.host(), req.portOrDefault(), req.startTlsOrDefault()));
   }
 }
