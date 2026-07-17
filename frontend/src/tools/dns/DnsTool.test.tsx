@@ -107,11 +107,13 @@ test('keeps an empty Answer open while retaining an Authority section', async ()
 
 test('renders per-query errors alongside a protocol response without a top-level ErrorView', async () => {
   mockedCallTool.mockResolvedValue(report({
-    respondedQueryCount: 1,
+    respondedQueryCount: 10,
     queries: [
       query({ type: 'MX', answer: [], authority: [], additional: [] }),
       query({ type: 'A', rcode: null, flags: null, error: { code: 'DNS_TIMEOUT', message: '查询超时' }, answer: [], authority: [], additional: [] }),
       query({ type: 'AAAA', rcode: null, flags: null, error: { code: 'DNS_TRANSPORT_ERROR', message: '网络不可达' }, answer: [], authority: [], additional: [] }),
+      ...['CNAME', 'TXT', 'NS', 'SOA', 'CAA', 'SRV', 'DS', 'DNSKEY', 'RRSIG'].map(type =>
+        query({ type, answer: [], authority: [], additional: [] })),
     ],
   }));
   await runQuery();
