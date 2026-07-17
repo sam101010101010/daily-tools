@@ -93,6 +93,33 @@ test('shows protocol rcode rather than ErrorView for a successful NXDOMAIN respo
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
+test('keeps an empty Answer open while retaining an Authority section', async () => {
+  mockedCallTool.mockResolvedValue(report({
+    queries: [query({ answer: [], authority: [record({ type: 'NS', value: 'ns1.example.com.' })], additional: [] })],
+  }));
+  await runQuery();
+
+  const answer = await screen.findByText('Answer（0）');
+  expect(answer.closest('details')).toHaveAttribute('open');
+  expect(answer.closest('details')).toHaveTextContent('没有记录。');
+  expect(screen.getByText('Authority（1）')).toBeVisible();
+});
+
+test('renders reports containing only per-query errors without a top-level ErrorView', async () => {
+  mockedCallTool.mockResolvedValue(report({
+    respondedQueryCount: 0,
+    queries: [
+      query({ type: 'A', rcode: null, flags: null, error: { code: 'DNS_TIMEOUT', message: '查询超时' }, answer: [], authority: [], additional: [] }),
+      query({ type: 'AAAA', rcode: null, flags: null, error: { code: 'DNS_TRANSPORT_ERROR', message: '网络不可达' }, answer: [], authority: [], additional: [] }),
+    ],
+  }));
+  await runQuery();
+
+  expect(await screen.findByText('DNS_TIMEOUT: 查询超时')).toBeInTheDocument();
+  expect(screen.getByText('DNS_TRANSPORT_ERROR: 网络不可达')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
 test('shows a query-level timeout in the corresponding record-type block', async () => {
   mockedCallTool.mockResolvedValue(report({
     queries: [query({ type: 'AAAA', rcode: null, flags: null, error: { code: 'DNS_TIMEOUT', message: '查询超时' }, answer: [], authority: [], additional: [] })],

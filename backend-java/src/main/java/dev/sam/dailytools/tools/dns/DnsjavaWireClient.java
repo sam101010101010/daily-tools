@@ -30,6 +30,8 @@ import java.io.InterruptedIOException;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,10 +137,12 @@ public class DnsjavaWireClient implements DnsWireClient {
       fields.put("keyTag", String.valueOf(ds.getFootprint()));
       fields.put("algorithm", String.valueOf(ds.getAlgorithm()));
       fields.put("digestType", String.valueOf(ds.getDigestID()));
+      fields.put("digest", HexFormat.of().formatHex(ds.getDigest()));
     } else if (record instanceof DNSKEYRecord dnskey) {
       fields.put("flags", String.valueOf(dnskey.getFlags()));
       fields.put("protocol", String.valueOf(dnskey.getProtocol()));
       fields.put("algorithm", String.valueOf(dnskey.getAlgorithm()));
+      fields.put("key", Base64.getEncoder().encodeToString(dnskey.getKey()));
     } else if (record instanceof RRSIGRecord rrsig) {
       fields.put("typeCovered", Type.string(rrsig.getTypeCovered()));
       fields.put("algorithm", String.valueOf(rrsig.getAlgorithm()));
@@ -147,6 +151,8 @@ public class DnsjavaWireClient implements DnsWireClient {
       fields.put("signatureExpiration", rrsig.getExpire().toString());
       fields.put("signatureInception", rrsig.getTimeSigned().toString());
       fields.put("keyTag", String.valueOf(rrsig.getFootprint()));
+      fields.put("signer", rrsig.getSigner().toString());
+      fields.put("signature", Base64.getEncoder().encodeToString(rrsig.getSignature()));
     }
     return new DnsRecord(
         record.getName().toString(),
