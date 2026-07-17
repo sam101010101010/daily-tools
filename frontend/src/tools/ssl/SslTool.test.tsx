@@ -166,7 +166,18 @@ test('copies a certificate summary through the shared formatter and announces su
 
   expect(writeText).toHaveBeenCalledWith(formatCertSummary(cert()));
   expect(await screen.findByRole('status')).toHaveTextContent('已复制');
-  expect(screen.getByRole('button', { name: '复制证书摘要' })).toHaveTextContent('已复制');
+  expect(screen.getByRole('button', { name: '复制证书摘要' })).toHaveAttribute('data-copy-state', 'success');
+});
+
+test('uses compact icon-only controls for certificate details while retaining labelled export actions', async () => {
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  expect(screen.getByRole('button', { name: '复制证书摘要' })).toHaveAttribute('data-copy-state', 'copy');
+  expect(screen.getByRole('button', { name: '复制 PEM' })).toHaveAttribute('data-copy-state', 'copy');
+  expect(screen.getByRole('button', { name: '复制 SHA-256 指纹' })).toHaveAttribute('data-copy-state', 'copy');
+  expect(screen.getByRole('button', { name: '复制诊断报告' })).toHaveTextContent('复制诊断报告');
+  expect(screen.getByRole('button', { name: '复制完整链' })).toHaveTextContent('复制完整链');
 });
 
 test('copies the certificate PEM and disables that action when PEM is absent', async () => {
