@@ -73,6 +73,12 @@ class DnsControllerTest {
         .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
 
     mvc.perform(post("/api/java/dns").contentType("application/json")
+            .content("{\"domain\":\"example.com\",\"resolver\":\"SYSTEM\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.ok").value(false))
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+
+    mvc.perform(post("/api/java/dns").contentType("application/json")
             .content("{\"domain\":\"ldap://attacker:1389/x\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.ok").value(false))

@@ -3,8 +3,6 @@ package dev.sam.dailytools.tools.dns;
 import com.fasterxml.jackson.annotation.JsonValue;
 import dev.sam.dailytools.common.ToolException;
 
-import java.util.Locale;
-
 public enum DnsResolverChoice {
   SYSTEM,
   CLOUDFLARE;
@@ -17,7 +15,7 @@ public enum DnsResolverChoice {
     if (value == null) {
       return SYSTEM;
     }
-    return switch (value.toLowerCase(Locale.ROOT)) {
+    return switch (value) {
       case "system" -> SYSTEM;
       case "cloudflare" -> CLOUDFLARE;
       default -> throw new ToolException("VALIDATION_ERROR", "resolver must be system or cloudflare");
@@ -26,6 +24,6 @@ public enum DnsResolverChoice {
 
   @JsonValue
   public String value() {
-    return name().toLowerCase(Locale.ROOT);
+    return name().toLowerCase(java.util.Locale.ROOT);
   }
 }

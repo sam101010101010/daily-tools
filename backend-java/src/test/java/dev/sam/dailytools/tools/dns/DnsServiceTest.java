@@ -2,11 +2,18 @@ package dev.sam.dailytools.tools.dns;
 
 import dev.sam.dailytools.common.ToolException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +55,25 @@ class DnsServiceTest {
       assertThat(query.queryName()).isEqualTo("7.113.0.203.in-addr.arpa.");
       assertThat(query.type()).isEqualTo("PTR");
     });
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"123", "1.2.3"})
+  void numeric_dns_labels_remain_forward_hostname_queries(String input) {
+    List<String> names = Collections.synchronizedList(new ArrayList<>());
+    List<String> types = Collections.synchronizedList(new ArrayList<>());
+    DnsService service = new DnsService((name, type, resolver) -> {
+      names.add(name);
+      types.add(type);
+      return response(name, type, "NOERROR");
+    });
+
+    DnsReport report = service.resolve(input, DnsResolverChoice.SYSTEM);
+
+    assertThat(names).containsOnly(input + ".");
+    assertThat(types).containsExactlyInAnyOrderElementsOf(DnsService.FORWARD_TYPES);
+    assertThat(report.queries()).extracting(DnsQueryResult::type)
+        .containsExactlyElementsOf(DnsService.FORWARD_TYPES);
   }
 
   @Test
@@ -115,6 +141,44 @@ class DnsServiceTest {
     assertThat(report.respondedQueryCount()).isEqualTo(1);
     assertThat(report.queries()).filteredOn(query -> query.error() != null)
         .allSatisfy(query -> assertThat(query.error().code()).isEqualTo("DNS_TIMEOUT"));
+  }
+
+  @Test
+  void domain_queries_never_exceed_four_simultaneous_wire_calls() throws Exception {
+    CountDownLatch fourCallsStarted = new CountDownLatch(4);
+    CountDownLatch releaseCalls = new CountDownLatch(1);
+    AtomicInteger inFlight = new AtomicInteger();
+    AtomicInteger maximumInFlight = new AtomicInteger();
+    DnsService service = new DnsService((name, type, resolver) -> {
+      int current = inFlight.incrementAndGet();
+      maximumInFlight.accumulateAndGet(current, Math::max);
+      fourCallsStarted.countDown();
+      try {
+        releaseCalls.await();
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        return DnsQueryResult.transportError(name, type, 0, "DNS_TRANSPORT_ERROR", "interrupted");
+      } finally {
+        inFlight.decrementAndGet();
+      }
+      return response(name, type, "NOERROR");
+    });
+    ExecutorService caller = Executors.newSingleThreadExecutor();
+    try {
+      CompletableFuture<DnsReport> report = CompletableFuture.supplyAsync(
+          () -> service.resolve("example.com", DnsResolverChoice.SYSTEM), caller);
+
+      assertThat(fourCallsStarted.await(5, TimeUnit.SECONDS)).isTrue();
+      assertThat(maximumInFlight.get()).isEqualTo(4);
+      releaseCalls.countDown();
+
+      assertThat(report.get(5, TimeUnit.SECONDS).queries()).extracting(DnsQueryResult::type)
+          .containsExactlyElementsOf(DnsService.FORWARD_TYPES);
+      assertThat(maximumInFlight.get()).isLessThanOrEqualTo(4);
+    } finally {
+      releaseCalls.countDown();
+      caller.shutdownNow();
+    }
   }
 
   @Test

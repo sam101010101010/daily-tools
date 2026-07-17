@@ -77,7 +77,7 @@ public class DnsService {
     if (input == null || input.isBlank() || !input.equals(input.trim())) {
       throw validationError();
     }
-    if (input.matches("[0-9.]+")) {
+    if (isIpv4Literal(input)) {
       return new QueryPlan(reverseIpv4(input), List.of("PTR"));
     }
     if (input.matches("[0-9A-Fa-f:.]+") && input.contains(":")) {
@@ -91,24 +91,34 @@ public class DnsService {
 
   private static String reverseIpv4(String input) {
     String[] octets = input.split("\\.", -1);
-    if (octets.length != 4) {
-      throw validationError();
-    }
     int[] values = new int[4];
     for (int index = 0; index < octets.length; index++) {
-      try {
-        if (octets[index].isEmpty() || (octets[index].length() > 1 && octets[index].startsWith("0"))) {
-          throw validationError();
-        }
-        values[index] = Integer.parseInt(octets[index]);
-      } catch (NumberFormatException exception) {
-        throw validationError();
-      }
-      if (values[index] > 255) {
-        throw validationError();
-      }
+      values[index] = Integer.parseInt(octets[index]);
     }
     return values[3] + "." + values[2] + "." + values[1] + "." + values[0] + ".in-addr.arpa.";
+  }
+
+  private static boolean isIpv4Literal(String input) {
+    if (!input.matches("[0-9.]+")) {
+      return false;
+    }
+    String[] octets = input.split("\\.", -1);
+    if (octets.length != 4) {
+      return false;
+    }
+    for (String octet : octets) {
+      try {
+        if (octet.isEmpty() || (octet.length() > 1 && octet.startsWith("0"))) {
+          return false;
+        }
+        if (Integer.parseInt(octet) > 255) {
+          return false;
+        }
+      } catch (NumberFormatException exception) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static String reverseIpv6(String input) {
