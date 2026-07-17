@@ -7,6 +7,7 @@ import {
   type CertDetail,
   type SslReport,
 } from './copy';
+import type { SslReport as LiveSslReport } from '../tools/ssl/SslTool';
 
 const cert: CertDetail = {
   subjectCN: 'www.example.com', subjectO: null,
@@ -179,4 +180,18 @@ test('uses em dashes for missing diagnostic values', () => {
     '有效期：已过期',
     '自签名：是',
   ].join('\n'));
+});
+
+test('accepts the live SSL report model', () => {
+  const report: LiveSslReport = {
+    host: 'example.com', port: 443, startTls: 'none',
+    negotiated: { version: 'TLSv1.3', cipher: 'AES' }, supportedProtocols: [],
+    validation: {
+      trusted: true, trustError: null, hostnameMatch: true, matchedName: 'example.com',
+      selfSigned: false, expired: false, daysUntilExpiry: 1,
+    },
+    chain: [],
+  };
+
+  expect(formatDiagnosticReport(report)).toContain('目标：example.com:443');
 });
