@@ -2,11 +2,14 @@ package dev.sam.dailytools.tools.ssl;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -81,5 +84,36 @@ class ChainDescriberTest {
     assertThat(d.keySize()).isEqualTo(256);
     assertThat(d.signatureAlgorithm()).isEqualToIgnoringCase("SHA256withECDSA");
     assertThat(d.weakSignature()).isFalse();
+  }
+
+  @Test
+  void emits_stable_standard_pem_for_every_presented_chain_certificate() throws Exception {
+    List<X509Certificate> presentedChain = List.of(load("leaf-only.pem"), load("rsa-multi-san.pem"));
+    List<CertDetail> details = presentedChain.stream().map(ChainDescriber::describe).toList();
+
+    assertThat(details).hasSize(2);
+    for (int i = 0; i < presentedChain.size(); i++) {
+      String pem = details.get(i).pem();
+      assertThat(pem).startsWith("-----BEGIN CERTIFICATE-----\n")
+          .endsWith("-----END CERTIFICATE-----\n");
+      assertThat(pem.lines().skip(1).limit(pem.lines().count() - 2))
+          .allSatisfy(line -> assertThat(line).hasSizeLessThanOrEqualTo(64));
+      assertThat(pem.lines().skip(1).limit(pem.lines().count() - 2))
+          .anySatisfy(line -> assertThat(line).hasSize(64));
+      assertThat(reparse(pem).getEncoded()).isEqualTo(presentedChain.get(i).getEncoded());
+    }
+
+    assertThat(ChainDescriber.describe(presentedChain.getFirst()).pem())
+        .isEqualTo(details.getFirst().pem());
+  }
+
+  private static X509Certificate reparse(String pem) throws Exception {
+    String body = pem
+        .replace("-----BEGIN CERTIFICATE-----\n", "")
+        .replace("-----END CERTIFICATE-----\n", "")
+        .replace("\n", "");
+    try (ByteArrayInputStream in = new ByteArrayInputStream(Base64.getDecoder().decode(body))) {
+      return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(in);
+    }
   }
 }

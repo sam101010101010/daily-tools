@@ -24,4 +24,5 @@ public record CertDetail(
     boolean weakSignature,
     String sha256Fingerprint,
     String serialNumber,
-    List<String> sans) {}
+    List<String> sans,
+    String pem) {}

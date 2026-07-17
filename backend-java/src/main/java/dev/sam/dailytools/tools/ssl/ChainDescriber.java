@@ -11,6 +11,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 
@@ -21,6 +22,9 @@ import java.util.Locale;
  * rather than throwing (a bad cert is data to report, not a 500).
  */
 public final class ChainDescriber {
+
+  private static final Base64.Encoder PEM_BASE64 =
+      Base64.getMimeEncoder(64, new byte[] {'\n'});
 
   private ChainDescriber() {}
 
@@ -48,7 +52,8 @@ public final class ChainDescriber {
         isWeakSignature(cert.getSigAlgName()),
         sha256Fingerprint(cert),
         cert.getSerialNumber().toString(),
-        sans(cert));
+        sans(cert),
+        pem(cert));
   }
 
   /** First value of RDN {@code type} (e.g. CN / O) in {@code dn}, or null if absent/malformed. */
@@ -96,6 +101,16 @@ public final class ChainDescriber {
         sb.append(String.format("%02X", b));
       }
       return sb.toString();
+    } catch (GeneralSecurityException e) {
+      return null;
+    }
+  }
+
+  private static String pem(X509Certificate cert) {
+    try {
+      return "-----BEGIN CERTIFICATE-----\n"
+          + PEM_BASE64.encodeToString(cert.getEncoded())
+          + "\n-----END CERTIFICATE-----\n";
     } catch (GeneralSecurityException e) {
       return null;
     }
