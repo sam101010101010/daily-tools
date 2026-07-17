@@ -706,6 +706,7 @@ main section li {
 
 .ssl__chain { display: flex; flex-direction: column; gap: 0.5rem; }
 .ssl__cert { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.ssl__cert-head-row { display: flex; align-items: center; gap: 0.5rem; padding-right: 0.5rem; }
 .ssl__cert-head {
   width: 100%;
   text-align: left;
@@ -717,6 +718,14 @@ main section li {
   font-weight: 600;
   cursor: pointer;
 }
+.ssl__cert-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.ssl__cert-actions button, .ssl__cert-body dd button {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+.ssl__cert-body dd { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; }
+.ssl__copy-status { margin: 0 0.75rem 0.5rem; color: var(--accent-strong); font-size: 0.82rem; }
 .ssl__cert-body { margin: 0; padding: 0 0.75rem 0.75rem; display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; font-size: 0.88rem; }
 .ssl__cert-body dt { color: var(--text-muted); }
 .ssl__cert-body dd { margin: 0; }
