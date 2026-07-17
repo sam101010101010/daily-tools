@@ -697,6 +697,10 @@ main section li {
 
 .ssl__negotiated { margin: 0.5rem 0; color: var(--text-muted); font-size: 0.9rem; }
 
+.ssl__report-actions, .ssl__chain-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; }
+.ssl__result-copy-action { display: flex; align-items: center; gap: 0.5rem; }
+.ssl__result-copy-status { margin: 0; color: var(--accent-strong); font-size: 0.82rem; }
+
 .ssl__matrix { border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.9rem; }
 .ssl__matrix th, .ssl__matrix td { padding: 0.3rem 0.9rem 0.3rem 0; text-align: left; }
 .ssl__matrix th { color: var(--text-muted); font-weight: 600; }

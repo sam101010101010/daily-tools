@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { callTool } from '../../lib/api';
-import { copyText, formatCertSummary } from '../../lib/copy';
+import {
+  copyText,
+  formatCertSummary,
+  formatChainPem,
+  formatDiagnosticReport,
+} from '../../lib/copy';
 import { ErrorView } from '../../components/ErrorView';
 import type { CertDetail, SslReport } from './types';
 
@@ -9,6 +14,39 @@ export type { SslReport } from './types';
 type BadgeTone = 'ok' | 'bad' | 'warn';
 function Badge({ tone, children }: { tone: BadgeTone; children: ReactNode }) {
   return <span className={`ssl__badge ssl__badge--${tone}`}>{children}</span>;
+}
+
+function CopyAction({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copiedTimeout.current) clearTimeout(copiedTimeout.current);
+  }, []);
+
+  async function copy() {
+    if (copiedTimeout.current) clearTimeout(copiedTimeout.current);
+    setCopied(false);
+    setCopyError('');
+    const result = await copyText(value);
+    if (!result.ok) {
+      setCopyError(result.message);
+      return;
+    }
+    setCopied(true);
+    copiedTimeout.current = setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="ssl__result-copy-action">
+      <button aria-label={label} disabled={!value} onClick={() => void copy()}>
+        {copied ? '已复制' : label}
+      </button>
+      {copied && <p className="ssl__result-copy-status" role="status" aria-live="polite">已复制</p>}
+      {copyError && <ErrorView message={copyError} />}
+    </div>
+  );
 }
 
 function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolean }) {
@@ -104,6 +142,7 @@ export default function SslTool() {
   }
 
   const v = report?.validation;
+  const chainPem = report ? formatChainPem(report.chain) : '';
   return (
     <div className="ssl">
       <div className="ssl__form">
@@ -144,6 +183,10 @@ export default function SslTool() {
 
       {report && (
         <>
+          <div className="ssl__report-actions">
+            <CopyAction label="复制诊断报告" value={formatDiagnosticReport(report)} />
+          </div>
+
           <p className="ssl__negotiated">
             协商结果：{report.negotiated.version} · {report.negotiated.cipher}
           </p>
@@ -164,6 +207,9 @@ export default function SslTool() {
           )}
 
           <div className="ssl__chain">
+            <div className="ssl__chain-actions">
+              <CopyAction label="复制完整链" value={chainPem} />
+            </div>
             {report.chain.map((c, i) => <CertCard key={i} cert={c} defaultOpen={i === 0} />)}
           </div>
         </>

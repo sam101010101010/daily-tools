@@ -214,3 +214,66 @@ test('copy buttons are keyboard reachable and do not expand a collapsed card', a
   expect(intermediateHeader).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByText('IN:TE:11')).not.toBeInTheDocument();
 });
+
+// ---- M7 T5: diagnostic report + full-chain copy actions ----
+
+test('does not render the diagnostic-report action before a report exists', () => {
+  render(<SslTool />);
+
+  expect(screen.queryByRole('button', { name: '复制诊断报告' })).not.toBeInTheDocument();
+});
+
+test('copies the human-readable diagnostic report without PEM values and announces success', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制诊断报告' }));
+
+  const copied = writeText.mock.calls[0][0] as string;
+  expect(copied).toContain('目标：example.com:443');
+  expect(copied).not.toContain('-----BEGIN CERTIFICATE-----');
+  expect(await screen.findByRole('status')).toHaveTextContent('已复制');
+});
+
+test('copies usable PEM values in certificate-chain order with one blank line between them', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  const leafPem = '-----BEGIN CERTIFICATE-----\nLEAF\n-----END CERTIFICATE-----\n';
+  const intermediatePem = '-----BEGIN CERTIFICATE-----\nINTERMEDIATE\n-----END CERTIFICATE-----\n';
+  mockedCallTool.mockResolvedValue(report({
+    chain: [cert({ pem: leafPem }), cert({ subjectCN: 'Intermediate CA', pem: intermediatePem })],
+  }));
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制完整链' }));
+
+  expect(writeText).toHaveBeenCalledWith(`${leafPem}\n${intermediatePem}`);
+  expect(await screen.findByRole('status')).toHaveTextContent('已复制');
+});
+
+test('disables full-chain copying when no usable PEM value is present', async () => {
+  mockedCallTool.mockResolvedValue(report({ chain: [cert({ pem: null })] }));
+  await runCheck();
+
+  expect(await screen.findByRole('button', { name: '复制完整链' })).toBeDisabled();
+});
+
+test('reports full-chain clipboard failures without a success announcement', async () => {
+  setClipboard(vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError')));
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制完整链' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('复制失败，请手动复制。');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('does not offer a combined copy-all action', async () => {
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  expect(screen.queryByRole('button', { name: /全部复制/ })).not.toBeInTheDocument();
+});
