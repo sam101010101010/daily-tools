@@ -76,6 +76,16 @@ class DnsServiceTest {
         .containsExactlyElementsOf(DnsService.FORWARD_TYPES);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"999.999.999.999", "1.02.3.4"})
+  void invalid_four_label_numeric_ipv4_candidates_are_validation_errors(String input) {
+    DnsService service = new DnsService((name, type, resolver) -> response(name, type, "NOERROR"));
+
+    assertThatThrownBy(() -> service.resolve(input, DnsResolverChoice.SYSTEM))
+        .isInstanceOf(ToolException.class)
+        .satisfies(error -> assertThat(((ToolException) error).getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+
   @Test
   void ipv6_literal_becomes_nibble_reversed_ptr_query() {
     List<String> names = Collections.synchronizedList(new ArrayList<>());

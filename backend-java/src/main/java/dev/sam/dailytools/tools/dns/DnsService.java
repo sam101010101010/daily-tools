@@ -77,7 +77,10 @@ public class DnsService {
     if (input == null || input.isBlank() || !input.equals(input.trim())) {
       throw validationError();
     }
-    if (isIpv4Literal(input)) {
+    if (isFourLabelNumericCandidate(input)) {
+      if (!isIpv4Literal(input)) {
+        throw validationError();
+      }
       return new QueryPlan(reverseIpv4(input), List.of("PTR"));
     }
     if (input.matches("[0-9A-Fa-f:.]+") && input.contains(":")) {
@@ -99,13 +102,7 @@ public class DnsService {
   }
 
   private static boolean isIpv4Literal(String input) {
-    if (!input.matches("[0-9.]+")) {
-      return false;
-    }
     String[] octets = input.split("\\.", -1);
-    if (octets.length != 4) {
-      return false;
-    }
     for (String octet : octets) {
       try {
         if (octet.isEmpty() || (octet.length() > 1 && octet.startsWith("0"))) {
@@ -119,6 +116,10 @@ public class DnsService {
       }
     }
     return true;
+  }
+
+  private static boolean isFourLabelNumericCandidate(String input) {
+    return input.matches("[0-9.]+") && input.split("\\.", -1).length == 4;
   }
 
   private static String reverseIpv6(String input) {
