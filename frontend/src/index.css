@@ -238,7 +238,8 @@ main section > div:not(.tool-grid) {
 
 textarea,
 input[type="text"],
-input:not([type]) {
+input:not([type]),
+select {
   width: 100%;
   padding: 0.7rem 0.85rem;
   font-family: var(--mono);
@@ -260,7 +261,8 @@ textarea {
 
 textarea:focus,
 input[type="text"]:focus,
-input:not([type]):focus {
+input:not([type]):focus,
+select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-weak);
@@ -279,6 +281,12 @@ label input:not([type]),
 label input[type="text"] {
   width: auto;
   min-width: 16rem;
+  font-family: var(--font);
+}
+
+label select {
+  width: auto;
+  min-width: 12rem;
   font-family: var(--font);
 }
 
@@ -404,9 +412,57 @@ main section li {
   header h1 { padding: 1rem 1.1rem; }
   main section > div { padding: 1.15rem; }
   label input:not([type]),
-  label input[type="text"] { min-width: 0; width: 100%; }
+  label input[type="text"],
+  label select { min-width: 0; width: 100%; }
   label { width: 100%; }
   label + button { margin: 0.75rem 0 0; }
+}
+
+/* ---- DNS diagnostic report --------------------------------------------- */
+
+.dns__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.dns__form label + button { margin-left: 0; }
+
+.dns__summary { margin-top: 1.25rem; }
+
+.dns__queries { margin-top: 1.25rem; }
+
+.dns__query,
+.dns__section {
+  border-top: 1px solid var(--border);
+  padding: 0.8rem 0;
+}
+
+.dns__query summary,
+.dns__section summary {
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.dns__query-meta,
+.dns__record-meta {
+  margin: 0.75rem 0 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dns__section { margin-top: 0.8rem; padding-left: 0.75rem; }
+.dns__section h4 { margin-top: 0.75rem; }
+.dns__record-meta { grid-template-columns: max-content minmax(0, 1fr); font-size: 0.84rem; }
+.dns__empty, .dns__query-error { margin: 0.75rem 0 0; color: var(--text-muted); }
+.dns__query-error { color: var(--danger); }
+.dns__raw pre { margin-top: 0.75rem; }
+
+@media (max-width: 560px) {
+  .dns__form { align-items: stretch; }
+  .dns__form button { align-self: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
