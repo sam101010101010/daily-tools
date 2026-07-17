@@ -42,11 +42,7 @@ public class DnsjavaWireClient implements DnsWireClient {
   public DnsQueryResult query(String qname, String type, DnsResolverChoice resolverChoice) {
     long startedAt = System.nanoTime();
     try {
-      int queryType = Type.value(type);
-      if (queryType < 0 || queryType == Type.ANY) {
-        throw new IllegalArgumentException("A concrete DNS record type is required");
-      }
-      Message request = Message.newQuery(Record.newRecord(Name.fromString(qname), queryType, DClass.IN));
+      Message request = buildQuery(qname, type);
       Message response = resolverFor(DnsResolverChoice.defaultFor(resolverChoice)).send(request);
       return mapResponse(qname, type, elapsedMs(startedAt), response);
     } catch (InterruptedIOException exception) {
@@ -54,6 +50,14 @@ public class DnsjavaWireClient implements DnsWireClient {
     } catch (IOException exception) {
       return DnsQueryResult.transportError(qname, type, elapsedMs(startedAt), "DNS_TRANSPORT_ERROR", messageFor(exception));
     }
+  }
+
+  static Message buildQuery(String qname, String type) throws IOException {
+    int queryType = Type.value(type);
+    if (queryType < 0 || queryType == Type.ANY) {
+      throw new IllegalArgumentException("A concrete DNS record type is required");
+    }
+    return Message.newQuery(Record.newRecord(Name.fromString(qname, Name.root), queryType, DClass.IN));
   }
 
   private static Resolver resolverFor(DnsResolverChoice resolverChoice) throws IOException {

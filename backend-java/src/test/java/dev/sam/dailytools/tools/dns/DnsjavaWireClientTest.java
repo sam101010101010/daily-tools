@@ -24,6 +24,7 @@ class DnsjavaWireClientTest {
     Message message = new Message();
     message.getHeader().setRcode(Rcode.NOERROR);
     message.getHeader().setFlag(Flags.AA);
+    message.getHeader().setFlag(Flags.TC);
     message.getHeader().setFlag(Flags.RD);
     message.getHeader().setFlag(Flags.RA);
     message.getHeader().setFlag(Flags.AD);
@@ -34,7 +35,7 @@ class DnsjavaWireClientTest {
     DnsQueryResult result = DnsjavaWireClient.mapResponse("example.com.", "MX", 17, message);
 
     assertThat(result.rcode()).isEqualTo("NOERROR");
-    assertThat(result.flags()).isEqualTo(new DnsFlags(true, false, true, true, true));
+    assertThat(result.flags()).isEqualTo(new DnsFlags(true, true, true, true, true));
     assertThat(result.answer()).singleElement().satisfies(record -> {
       assertThat(record.name()).isEqualTo("example.com.");
       assertThat(record.type()).isEqualTo("MX");
@@ -48,6 +49,14 @@ class DnsjavaWireClientTest {
       assertThat(record.type()).isEqualTo("A");
       assertThat(record.value()).isEqualTo("192.0.2.53");
     });
+  }
+
+  @Test
+  void builds_an_absolute_question_for_a_hostname_without_a_trailing_dot() throws Exception {
+    Message request = DnsjavaWireClient.buildQuery("example.com", "A");
+
+    assertThat(request.getQuestion().getName().isAbsolute()).isTrue();
+    assertThat(request.getQuestion().getName().toString()).isEqualTo("example.com.");
   }
 
   @Test
