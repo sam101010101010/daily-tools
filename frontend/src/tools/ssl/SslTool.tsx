@@ -1,51 +1,112 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { callTool } from '../../lib/api';
+import {
+  copyText,
+  formatCertSummary,
+  formatChainPem,
+  formatDiagnosticReport,
+} from '../../lib/copy';
 import { ErrorView } from '../../components/ErrorView';
+import type { CertDetail, SslReport } from './types';
 
-interface CertDetail {
-  subjectCN: string | null; subjectO: string | null;
-  issuerCN: string | null; issuerO: string | null;
-  subjectDN: string; issuerDN: string;
-  notBefore: string; notAfter: string;
-  expired: boolean; daysUntilExpiry: number;
-  keyAlgorithm: string; keySize: number | null;
-  signatureAlgorithm: string; weakSignature: boolean;
-  sha256Fingerprint: string; serialNumber: string;
-  sans: string[];
-}
-interface ProtocolResult { protocol: string; supported: boolean; weak: boolean; }
-interface Validation {
-  trusted: boolean; trustError: string | null;
-  hostnameMatch: boolean; matchedName: string | null;
-  selfSigned: boolean; expired: boolean; daysUntilExpiry: number;
-}
-interface Negotiated { version: string; cipher: string; }
-export interface SslReport {
-  host: string; port: number; startTls: string;
-  negotiated: Negotiated;
-  supportedProtocols: ProtocolResult[];
-  validation: Validation;
-  chain: CertDetail[];
-}
+export type { SslReport } from './types';
 
 type BadgeTone = 'ok' | 'bad' | 'warn';
 function Badge({ tone, children }: { tone: BadgeTone; children: ReactNode }) {
   return <span className={`ssl__badge ssl__badge--${tone}`}>{children}</span>;
 }
 
+function CopyAction({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copiedTimeout.current) clearTimeout(copiedTimeout.current);
+  }, []);
+
+  async function copy() {
+    if (copiedTimeout.current) clearTimeout(copiedTimeout.current);
+    setCopied(false);
+    setCopyError('');
+    const result = await copyText(value);
+    if (!result.ok) {
+      setCopyError(result.message);
+      return;
+    }
+    setCopied(true);
+    copiedTimeout.current = setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="ssl__result-copy-action">
+      <button aria-label={label} disabled={!value} onClick={() => void copy()}>
+        {copied ? '已复制' : label}
+      </button>
+      {copied && <p className="ssl__result-copy-status" role="status" aria-live="polite">已复制</p>}
+      {copyError && <ErrorView message={copyError} />}
+    </div>
+  );
+}
+
 function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [copiedAction, setCopiedAction] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState('');
+  const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const subject = cert.subjectCN ?? cert.subjectDN;
+  const issuer = cert.issuerCN ?? cert.issuerDN;
+  const subjectDisplay = `${subject}${cert.subjectO ? ` · ${cert.subjectO}` : ''}`;
+  const issuerDisplay = `${issuer}${cert.issuerO ? ` · ${cert.issuerO}` : ''}`;
+
+  useEffect(() => () => {
+    if (copiedTimeout.current) clearTimeout(copiedTimeout.current);
+  }, []);
+
+  async function copy(action: string, value: string) {
+    if (copiedTimeout.current) clearTimeout(copiedTimeout.current);
+    setCopiedAction(null);
+    setCopyError('');
+    const result = await copyText(value);
+    if (!result.ok) {
+      setCopyError(result.message);
+      return;
+    }
+    setCopiedAction(action);
+    copiedTimeout.current = setTimeout(() => setCopiedAction(null), 2000);
+  }
+
+  function actionText(action: string, text = '复制') {
+    return copiedAction === action ? '已复制' : text;
+  }
+
   return (
     <div className="ssl__cert">
-      <button className="ssl__cert-head" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span aria-hidden="true">{open ? '▾' : '▸'}</span> {cert.subjectCN ?? cert.subjectDN}
-      </button>
+      <div className="ssl__cert-head-row">
+        <button className="ssl__cert-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <span aria-hidden="true">{open ? '▾' : '▸'}</span> {subject}
+        </button>
+        <div className="ssl__cert-actions">
+          <button aria-label="复制证书摘要" onClick={() => void copy('summary', formatCertSummary(cert))}>
+            {actionText('summary', '复制摘要')}
+          </button>
+          <button
+            aria-label="复制 PEM"
+            disabled={!cert.pem}
+            onClick={() => cert.pem && void copy('pem', cert.pem)}
+          >
+            {actionText('pem', '复制 PEM')}
+          </button>
+        </div>
+      </div>
+      {copiedAction && <p className="ssl__copy-status" role="status" aria-live="polite">已复制</p>}
+      {copyError && <ErrorView message={copyError} />}
       {open && (
         <dl className="ssl__cert-body">
           <dt>Subject</dt>
-          <dd>{cert.subjectCN ?? cert.subjectDN}{cert.subjectO ? ` · ${cert.subjectO}` : ''}</dd>
+          <dd><span>{subjectDisplay}</span><button aria-label="复制 Subject" onClick={() => void copy('subject', subjectDisplay)}>{actionText('subject')}</button></dd>
           <dt>Issuer</dt>
-          <dd>{cert.issuerCN ?? cert.issuerDN}{cert.issuerO ? ` · ${cert.issuerO}` : ''}</dd>
+          <dd><span>{issuerDisplay}</span><button aria-label="复制 Issuer" onClick={() => void copy('issuer', issuerDisplay)}>{actionText('issuer')}</button></dd>
           <dt>有效期</dt>
           <dd>{cert.notBefore} → {cert.notAfter}（{cert.expired ? '已过期' : `剩 ${cert.daysUntilExpiry} 天`}）</dd>
           <dt>公钥</dt>
@@ -53,8 +114,10 @@ function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolea
           <dt>签名算法</dt>
           <dd>{cert.signatureAlgorithm} {cert.weakSignature && <span className="ssl__weak-sig">弱签名</span>}</dd>
           <dt>SHA-256 指纹</dt>
-          <dd className="ssl__fp">{cert.sha256Fingerprint}</dd>
-          {cert.sans.length > 0 && (<><dt>SAN</dt><dd>{cert.sans.join(', ')}</dd></>)}
+          <dd className="ssl__fp"><span>{cert.sha256Fingerprint}</span><button aria-label="复制 SHA-256 指纹" onClick={() => void copy('fingerprint', cert.sha256Fingerprint)}>{actionText('fingerprint')}</button></dd>
+          <dt>序列号</dt>
+          <dd><span>{cert.serialNumber}</span><button aria-label="复制序列号" onClick={() => void copy('serial', cert.serialNumber)}>{actionText('serial')}</button></dd>
+          {cert.sans.length > 0 && (<><dt>SAN</dt><dd><span>{cert.sans.join(', ')}</span><button aria-label="复制 SAN" onClick={() => void copy('san', cert.sans.join(', '))}>{actionText('san')}</button></dd></>)}
         </dl>
       )}
     </div>
@@ -79,6 +142,7 @@ export default function SslTool() {
   }
 
   const v = report?.validation;
+  const chainPem = report ? formatChainPem(report.chain) : '';
   return (
     <div className="ssl">
       <div className="ssl__form">
@@ -119,6 +183,10 @@ export default function SslTool() {
 
       {report && (
         <>
+          <div className="ssl__report-actions">
+            <CopyAction label="复制诊断报告" value={formatDiagnosticReport(report)} />
+          </div>
+
           <p className="ssl__negotiated">
             协商结果：{report.negotiated.version} · {report.negotiated.cipher}
           </p>
@@ -139,6 +207,9 @@ export default function SslTool() {
           )}
 
           <div className="ssl__chain">
+            <div className="ssl__chain-actions">
+              <CopyAction label="复制完整链" value={chainPem} />
+            </div>
             {report.chain.map((c, i) => <CertCard key={i} cert={c} defaultOpen={i === 0} />)}
           </div>
         </>

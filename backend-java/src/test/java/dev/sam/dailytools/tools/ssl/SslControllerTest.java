@@ -30,7 +30,8 @@ class SslControllerTest {
         List.of(new CertDetail("example.com", "Example Org", "DigiCert", "DigiCert Inc",
             "CN=example.com,O=Example Org", "CN=DigiCert", "2020-01-01T00:00:00Z",
             "2030-01-01T00:00:00Z", false, 1000, "RSA", 2048, "SHA256withRSA", false,
-            "AA:BB", "123", List.of("example.com"))));
+            "AA:BB", "123", List.of("example.com"),
+            "-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n")));
   }
 
   @Test
@@ -43,6 +44,7 @@ class SslControllerTest {
        .andExpect(jsonPath("$.data.chain").isArray())
        .andExpect(jsonPath("$.data.chain[0].subjectCN").value("example.com"))
        .andExpect(jsonPath("$.data.chain[0].sha256Fingerprint").value("AA:BB"))
+       .andExpect(jsonPath("$.data.chain[0].pem").value("-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n"))
        .andExpect(jsonPath("$.data.validation").exists())
        .andExpect(jsonPath("$.data.validation.trusted").value(true))
        .andExpect(jsonPath("$.data.supportedProtocols").isArray());

@@ -2,12 +2,20 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi, afterEach, test, expect } from 'vitest';
 import { callTool } from '../../lib/api';
+import { formatCertSummary } from '../../lib/copy';
 import SslTool from './SslTool';
 
 vi.mock('../../lib/api', () => ({ callTool: vi.fn() }));
 const mockedCallTool = vi.mocked(callTool);
 
 afterEach(() => vi.clearAllMocks());
+
+function setClipboard(writeText: (text: string) => Promise<void>) {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+}
 
 function cert(over: Record<string, unknown> = {}) {
   return {
@@ -20,6 +28,7 @@ function cert(over: Record<string, unknown> = {}) {
     signatureAlgorithm: 'SHA256withRSA', weakSignature: false,
     sha256Fingerprint: 'AA:BB:CC', serialNumber: '123',
     sans: ['example.com'],
+    pem: '-----BEGIN CERTIFICATE-----\nCERTIFICATE\n-----END CERTIFICATE-----\n',
     ...over,
   };
 }
@@ -128,4 +137,143 @@ test('flags a weak signature algorithm on a cert card', async () => {
   await runCheck();
   expect(await screen.findByText(/SHA1withRSA/)).toBeInTheDocument();
   expect(screen.getByText('弱签名')).toBeInTheDocument();
+});
+
+// ---- M7 T4: per-certificate copy actions ----
+
+test('copies a displayed certificate field without collapsing its card', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  const cardHeader = screen.getByRole('button', { name: /example\.com/ });
+  const fingerprintCopy = screen.getByRole('button', { name: '复制 SHA-256 指纹' });
+  await userEvent.click(fingerprintCopy);
+
+  expect(writeText).toHaveBeenCalledWith('AA:BB:CC');
+  expect(cardHeader).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('AA:BB:CC')).toBeInTheDocument();
+});
+
+test('copies a certificate summary through the shared formatter and announces success', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制证书摘要' }));
+
+  expect(writeText).toHaveBeenCalledWith(formatCertSummary(cert()));
+  expect(await screen.findByRole('status')).toHaveTextContent('已复制');
+  expect(screen.getByRole('button', { name: '复制证书摘要' })).toHaveTextContent('已复制');
+});
+
+test('copies the certificate PEM and disables that action when PEM is absent', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制 PEM' }));
+  expect(writeText).toHaveBeenCalledWith(cert().pem);
+
+  mockedCallTool.mockResolvedValue(report({ chain: [cert({ pem: null })] }));
+  await userEvent.click(screen.getByRole('button', { name: /检查/ }));
+  expect(await screen.findByRole('button', { name: '复制 PEM' })).toBeDisabled();
+});
+
+test('reports a clipboard failure instead of success', async () => {
+  setClipboard(vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError')));
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制序列号' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('复制失败，请手动复制。');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('copy buttons are keyboard reachable and do not expand a collapsed card', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  mockedCallTool.mockResolvedValue(report({
+    chain: [cert(), cert({ subjectCN: 'Intermediate CA', sha256Fingerprint: 'IN:TE:11' })],
+  }));
+  await runCheck();
+
+  const copySummaryButtons = screen.getAllByRole('button', { name: '复制证书摘要' });
+  const intermediateHeader = screen.getByRole('button', { name: /Intermediate CA/ });
+  copySummaryButtons[1].focus();
+  await userEvent.keyboard('{Enter}');
+
+  expect(writeText).toHaveBeenCalledWith(formatCertSummary(cert({
+    subjectCN: 'Intermediate CA', sha256Fingerprint: 'IN:TE:11',
+  })));
+  expect(document.activeElement).toBe(copySummaryButtons[1]);
+  expect(intermediateHeader).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByText('IN:TE:11')).not.toBeInTheDocument();
+});
+
+// ---- M7 T5: diagnostic report + full-chain copy actions ----
+
+test('does not render the diagnostic-report action before a report exists', () => {
+  render(<SslTool />);
+
+  expect(screen.queryByRole('button', { name: '复制诊断报告' })).not.toBeInTheDocument();
+});
+
+test('copies the human-readable diagnostic report without PEM values and announces success', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制诊断报告' }));
+
+  const copied = writeText.mock.calls[0][0] as string;
+  expect(copied).toContain('目标：example.com:443');
+  expect(copied).not.toContain('-----BEGIN CERTIFICATE-----');
+  expect(await screen.findByRole('status')).toHaveTextContent('已复制');
+});
+
+test('copies usable PEM values in certificate-chain order with one blank line between them', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  const leafPem = '-----BEGIN CERTIFICATE-----\nLEAF\n-----END CERTIFICATE-----\n';
+  const intermediatePem = '-----BEGIN CERTIFICATE-----\nINTERMEDIATE\n-----END CERTIFICATE-----\n';
+  mockedCallTool.mockResolvedValue(report({
+    chain: [cert({ pem: leafPem }), cert({ subjectCN: 'Intermediate CA', pem: intermediatePem })],
+  }));
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制完整链' }));
+
+  expect(writeText).toHaveBeenCalledWith(`${leafPem}\n${intermediatePem}`);
+  expect(await screen.findByRole('status')).toHaveTextContent('已复制');
+});
+
+test('disables full-chain copying when no usable PEM value is present', async () => {
+  mockedCallTool.mockResolvedValue(report({ chain: [cert({ pem: null })] }));
+  await runCheck();
+
+  expect(await screen.findByRole('button', { name: '复制完整链' })).toBeDisabled();
+});
+
+test('reports full-chain clipboard failures without a success announcement', async () => {
+  setClipboard(vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError')));
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  await userEvent.click(screen.getByRole('button', { name: '复制完整链' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('复制失败，请手动复制。');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('does not offer a combined copy-all action', async () => {
+  mockedCallTool.mockResolvedValue(report());
+  await runCheck();
+
+  expect(screen.queryByRole('button', { name: /全部复制/ })).not.toBeInTheDocument();
 });
