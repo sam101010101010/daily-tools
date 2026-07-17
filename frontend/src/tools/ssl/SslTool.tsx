@@ -16,6 +16,19 @@ function Badge({ tone, children }: { tone: BadgeTone; children: ReactNode }) {
   return <span className={`ssl__badge ssl__badge--${tone}`}>{children}</span>;
 }
 
+function CopyIcon({ copied = false }: { copied?: boolean }) {
+  return copied ? (
+    <svg className="ssl__copy-icon" aria-hidden="true" viewBox="0 0 24 24">
+      <path d="m5 12 4 4L19 6" />
+    </svg>
+  ) : (
+    <svg className="ssl__copy-icon" aria-hidden="true" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="10" height="10" rx="1" />
+      <path d="M15 9V6a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3" />
+    </svg>
+  );
+}
+
 function CopyAction({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState('');
@@ -41,7 +54,8 @@ function CopyAction({ label, value }: { label: string; value: string }) {
   return (
     <div className="ssl__result-copy-action">
       <button aria-label={label} disabled={!value} onClick={() => void copy()}>
-        {copied ? '已复制' : label}
+        <CopyIcon copied={copied} />
+        <span>{copied ? '已复制' : label}</span>
       </button>
       {copied && <p className="ssl__result-copy-status" role="status" aria-live="polite">已复制</p>}
       {copyError && <ErrorView message={copyError} />}
@@ -76,8 +90,20 @@ function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolea
     copiedTimeout.current = setTimeout(() => setCopiedAction(null), 2000);
   }
 
-  function actionText(action: string, text = '复制') {
-    return copiedAction === action ? '已复制' : text;
+  function copyButton(action: string, label: string, value: string, disabled = false) {
+    const copied = copiedAction === action;
+    return (
+      <button
+        className={`ssl__copy-button${copied ? ' ssl__copy-button--copied' : ''}`}
+        data-copy-state={copied ? 'success' : 'copy'}
+        aria-label={label}
+        title={label}
+        disabled={disabled}
+        onClick={() => void copy(action, value)}
+      >
+        <CopyIcon copied={copied} />
+      </button>
+    );
   }
 
   return (
@@ -87,16 +113,8 @@ function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolea
           <span aria-hidden="true">{open ? '▾' : '▸'}</span> {subject}
         </button>
         <div className="ssl__cert-actions">
-          <button aria-label="复制证书摘要" onClick={() => void copy('summary', formatCertSummary(cert))}>
-            {actionText('summary', '复制摘要')}
-          </button>
-          <button
-            aria-label="复制 PEM"
-            disabled={!cert.pem}
-            onClick={() => cert.pem && void copy('pem', cert.pem)}
-          >
-            {actionText('pem', '复制 PEM')}
-          </button>
+          {copyButton('summary', '复制证书摘要', formatCertSummary(cert))}
+          {copyButton('pem', '复制 PEM', cert.pem ?? '', !cert.pem)}
         </div>
       </div>
       {copiedAction && <p className="ssl__copy-status" role="status" aria-live="polite">已复制</p>}
@@ -104,9 +122,9 @@ function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolea
       {open && (
         <dl className="ssl__cert-body">
           <dt>Subject</dt>
-          <dd><span>{subjectDisplay}</span><button aria-label="复制 Subject" onClick={() => void copy('subject', subjectDisplay)}>{actionText('subject')}</button></dd>
+          <dd><span>{subjectDisplay}</span>{copyButton('subject', '复制 Subject', subjectDisplay)}</dd>
           <dt>Issuer</dt>
-          <dd><span>{issuerDisplay}</span><button aria-label="复制 Issuer" onClick={() => void copy('issuer', issuerDisplay)}>{actionText('issuer')}</button></dd>
+          <dd><span>{issuerDisplay}</span>{copyButton('issuer', '复制 Issuer', issuerDisplay)}</dd>
           <dt>有效期</dt>
           <dd>{cert.notBefore} → {cert.notAfter}（{cert.expired ? '已过期' : `剩 ${cert.daysUntilExpiry} 天`}）</dd>
           <dt>公钥</dt>
@@ -114,10 +132,10 @@ function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolea
           <dt>签名算法</dt>
           <dd>{cert.signatureAlgorithm} {cert.weakSignature && <span className="ssl__weak-sig">弱签名</span>}</dd>
           <dt>SHA-256 指纹</dt>
-          <dd className="ssl__fp"><span>{cert.sha256Fingerprint}</span><button aria-label="复制 SHA-256 指纹" onClick={() => void copy('fingerprint', cert.sha256Fingerprint)}>{actionText('fingerprint')}</button></dd>
+          <dd className="ssl__fp"><span>{cert.sha256Fingerprint}</span>{copyButton('fingerprint', '复制 SHA-256 指纹', cert.sha256Fingerprint)}</dd>
           <dt>序列号</dt>
-          <dd><span>{cert.serialNumber}</span><button aria-label="复制序列号" onClick={() => void copy('serial', cert.serialNumber)}>{actionText('serial')}</button></dd>
-          {cert.sans.length > 0 && (<><dt>SAN</dt><dd><span>{cert.sans.join(', ')}</span><button aria-label="复制 SAN" onClick={() => void copy('san', cert.sans.join(', '))}>{actionText('san')}</button></dd></>)}
+          <dd><span>{cert.serialNumber}</span>{copyButton('serial', '复制序列号', cert.serialNumber)}</dd>
+          {cert.sans.length > 0 && (<><dt>SAN</dt><dd><span>{cert.sans.join(', ')}</span>{copyButton('san', '复制 SAN', cert.sans.join(', '))}</dd></>)}
         </dl>
       )}
     </div>
