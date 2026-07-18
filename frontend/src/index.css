@@ -730,6 +730,45 @@ main section li {
   .crypto__actions { flex-wrap: wrap; }
 }
 
+/* ---- JWT decoder -------------------------------------------------------- */
+
+.jwt { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.jwt__safety {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  color: var(--danger);
+  background: var(--danger-weak);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+.jwt__label { display: block; color: var(--text-muted); }
+.jwt textarea { margin: -0.5rem 0 0; min-width: 0; overflow-wrap: anywhere; }
+.jwt__actions { display: flex; flex-wrap: wrap; }
+.jwt__results { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+.jwt__section { min-width: 0; }
+.jwt__section h3 { margin: 0; font-size: 0.95rem; }
+.jwt__section-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.jwt__section-head .jwt__copy { margin-left: auto; }
+.jwt__section pre { margin: 0.55rem 0 0; max-width: 100%; }
+.jwt__copy {
+  padding: 0.32rem 0.72rem;
+  color: var(--accent-strong);
+  background: var(--surface);
+  border-color: var(--border);
+}
+.jwt__copy:hover:not(:disabled) { color: var(--on-accent); }
+.jwt__copy-status { color: var(--accent-strong); font-size: 0.82rem; }
+.jwt__claims { display: flex; flex-direction: column; gap: 0.65rem; margin: 0.55rem 0 0; padding-top: 0.75rem; }
+.jwt__claims div { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.5rem 1.25rem; }
+.jwt__claims dd { min-width: 0; overflow-wrap: anywhere; }
+.jwt__date { display: block; margin-top: 0.2rem; color: var(--text-muted); font-family: var(--font); font-size: 0.86rem; }
+.jwt__empty { margin: 0.55rem 0 0; color: var(--text-muted); }
+
+@media (max-width: 560px) {
+  .jwt__section-head .jwt__copy { margin-left: 0; }
+  .jwt__claims div { grid-template-columns: 1fr; gap: 0.15rem; }
+}
+
 /* SSL inspector — input row + verdict badges (matrix + cert chain styled with T9) */
 .ssl__form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
 .ssl__form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-muted); }

@@ -1,0 +1,89 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, expect, test, vi } from 'vitest';
+import { formatNumericDate } from './jwt';
+import JwtTool from './JwtTool';
+
+function base64url(value: unknown): string {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(value))))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function token(payload: Record<string, unknown>) {
+  return `${base64url({ alg: 'HS256', typ: 'JWT' })}.${base64url(payload)}.c2ln`;
+}
+
+function setClipboard(writeText: (text: string) => Promise<void>) {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+test('decodes locally with formatted JSON, claims, readable NumericDates, and persistent safety meaning', async () => {
+  const user = userEvent.setup();
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  render(<JwtTool />);
+
+  expect(screen.getByText('已解码，未验证签名')).toBeInTheDocument();
+  await user.type(screen.getByLabelText('JWT'), token({
+    iss: 'https://issuer.example', sub: 'reader-123', aud: ['daily-tools', 'mobile'], exp: 0, nbf: 1, iat: -1,
+  }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  expect(screen.getByLabelText('Header JSON')).toHaveTextContent('"alg": "HS256"');
+  expect(screen.getByLabelText('Payload JSON')).toHaveTextContent('"sub": "reader-123"');
+  expect(screen.getByText('https://issuer.example')).toBeInTheDocument();
+  expect(screen.getByText('reader-123')).toBeInTheDocument();
+  expect(screen.getByText('daily-tools、mobile')).toBeInTheDocument();
+  expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(0)}`)).toBeInTheDocument();
+  expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(1)}`)).toBeInTheDocument();
+  expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(-1)}`)).toBeInTheDocument();
+  expect(screen.getByText('已解码，未验证签名')).toBeInTheDocument();
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+test('copies formatted Header and Payload through the shared safe clipboard helper', async () => {
+  const user = userEvent.setup();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  setClipboard(writeText);
+  render(<JwtTool />);
+  await user.type(screen.getByLabelText('JWT'), token({ sub: 'reader-123' }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  await user.click(screen.getByRole('button', { name: '复制 Header' }));
+  expect(writeText).toHaveBeenLastCalledWith(JSON.stringify({ alg: 'HS256', typ: 'JWT' }, null, 2));
+  await user.click(screen.getByRole('button', { name: '复制 Payload' }));
+  expect(writeText).toHaveBeenLastCalledWith(JSON.stringify({ sub: 'reader-123' }, null, 2));
+});
+
+test('clears stale results when decoding fails', async () => {
+  const user = userEvent.setup();
+  render(<JwtTool />);
+  const input = screen.getByLabelText('JWT');
+  await user.type(input, token({ sub: 'reader-123' }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+  expect(screen.getByLabelText('Header JSON')).toBeInTheDocument();
+
+  await user.clear(input);
+  await user.type(input, 'not-a-jwt');
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  expect(screen.getByRole('alert')).toHaveTextContent('JWT 必须是三段紧凑 JWS 格式');
+  expect(screen.queryByLabelText('Header JSON')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Payload JSON')).not.toBeInTheDocument();
+});
+
+test('shows a neutral state when no registered claims are present', async () => {
+  const user = userEvent.setup();
+  render(<JwtTool />);
+  await user.type(screen.getByLabelText('JWT'), token({ custom: 'only' }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  expect(screen.getByText('没有可展示的注册 claims。')).toBeInTheDocument();
+});

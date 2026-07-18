@@ -3,12 +3,14 @@ import { jsonMeta } from '../tools/json/meta';
 import { cryptoMeta } from '../tools/crypto/meta';
 import { sslMeta } from '../tools/ssl/meta';
 import { dnsMeta } from '../tools/dns/meta';
+import { jwtMeta } from '../tools/jwt/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
   cryptoMeta,
   sslMeta,
   dnsMeta,
+  jwtMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {
