@@ -41,3 +41,14 @@ test('crypto tool is a single registry entry with a backend; base64 is merged in
   const ids = registry.map(t => t.id);
   expect(new Set(ids).size).toBe(ids.length); // ids unique
 });
+
+test('JWT decoder is a single local registry tool searchable by jwt and 令牌', async () => {
+  const jwt = registry.filter(t => t.id === 'jwt');
+  expect(jwt).toHaveLength(1);
+  expect(jwt[0]).toMatchObject({ id: 'jwt', name: 'JWT 解码器' });
+  expect(jwt[0].backend).toBeUndefined();
+  expect(searchTools(registry, 'jwt').map(t => t.id)).toEqual(['jwt']);
+  expect(searchTools(registry, 'JWT').map(t => t.id)).toEqual(['jwt']);
+  expect(searchTools(registry, '令牌').map(t => t.id)).toEqual(['jwt']);
+  await expect(jwt[0].load()).resolves.toHaveProperty('default');
+});
