@@ -3,6 +3,8 @@ import { ErrorView } from '../../components/ErrorView';
 import { copyText } from '../../lib/copy';
 import { decodeJwt, formatNumericDate, type DecodedJwt } from './jwt';
 
+const EXAMPLE_JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJleGFtcGxlLXVzZXIiLCJpYXQiOjE3MDAwMDAwMDB9.c2ln';
+
 const CLAIM_LABELS: ReadonlyArray<readonly [key: 'iss' | 'sub' | 'aud' | 'exp' | 'nbf' | 'iat', label: string]> = [
   ['iss', '签发者（iss）'],
   ['sub', '主题（sub）'],
@@ -64,10 +66,6 @@ function DecodedResults({ value }: { value: DecodedJwt }) {
 
   return (
     <div className="jwt__results" aria-label="解码结果">
-      <p className="jwt__safety" aria-label="解码结果安全说明">
-        <strong>已解码，未验证签名</strong>
-        <span>。签名尚未验证，内容仅供查看，请勿据此决定访问权限。</span>
-      </p>
       <section className="jwt__section">
         <div className="jwt__section-head"><h3>Header</h3><CopyButton label="复制 Header" value={header} /></div>
         <pre aria-label="Header JSON">{header}</pre>
@@ -89,7 +87,7 @@ function DecodedResults({ value }: { value: DecodedJwt }) {
 }
 
 export default function JwtTool() {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(EXAMPLE_JWT);
   const [decoded, setDecoded] = useState<Readonly<{ id: number; value: DecodedJwt }>>();
   const [error, setError] = useState('');
   const resultSequence = useRef(0);
