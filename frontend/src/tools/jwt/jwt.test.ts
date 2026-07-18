@@ -132,16 +132,24 @@ test('returns immutable decoded values', () => {
   expect(Object.isFrozen(result.value.payload.roles)).toBe(true);
 });
 
-test('decodes deeply nested valid JSON without throwing outside its result union', () => {
+test('rejects JSON beyond the safe structural depth before it reaches UI formatting', () => {
   const depth = 10_000;
   const payload = `${'{"nested":'.repeat(depth)}0${'}'.repeat(depth)}`;
   const token = `${base64url('{"alg":"HS256"}')}.${base64url(payload)}.c2ln`;
 
-  const result = decodeJwt(token);
+  expect(decodeJwt(token)).toEqual({
+    ok: false,
+    error: 'JWT Payload 嵌套层级超过 100，无法安全显示',
+  });
+});
 
-  expect(result.ok).toBe(true);
-  if (!result.ok) return;
-  expect(Object.isFrozen(result.value.payload)).toBe(true);
+test('rejects JSON numeric overflow instead of fabricating a NumericDate display', () => {
+  const token = `${base64url('{"alg":"HS256"}')}.${base64url('{"exp":1e400}')}.c2ln`;
+
+  expect(decodeJwt(token)).toEqual({
+    ok: false,
+    error: 'JWT Payload 的 JSON 包含无法安全解析的非有限数字',
+  });
 });
 
 test('formats finite NumericDate values including zero, negatives, and fractions', () => {

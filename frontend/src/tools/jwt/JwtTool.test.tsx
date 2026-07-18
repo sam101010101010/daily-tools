@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { formatNumericDate } from './jwt';
@@ -30,7 +30,8 @@ test('decodes locally with formatted JSON, claims, readable NumericDates, and pe
   vi.stubGlobal('fetch', fetchSpy);
   render(<JwtTool />);
 
-  expect(screen.getByText('已解码，未验证签名')).toBeInTheDocument();
+  expect(screen.getByLabelText('页面安全说明')).toHaveTextContent('已解码，未验证签名');
+  expect(screen.getByLabelText('页面安全说明')).toHaveTextContent('请勿据此决定访问权限');
   await user.type(screen.getByLabelText('JWT'), token({
     iss: 'https://issuer.example', sub: 'reader-123', aud: ['daily-tools', 'mobile'], exp: 0, nbf: 1, iat: -1,
   }));
@@ -44,7 +45,11 @@ test('decodes locally with formatted JSON, claims, readable NumericDates, and pe
   expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(0)}`)).toBeInTheDocument();
   expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(1)}`)).toBeInTheDocument();
   expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(-1)}`)).toBeInTheDocument();
-  expect(screen.getByText('已解码，未验证签名')).toBeInTheDocument();
+  const results = screen.getByLabelText('解码结果');
+  expect(screen.getByLabelText('页面安全说明')).not.toBe(within(results).getByLabelText('解码结果安全说明'));
+  expect(within(results).getByLabelText('解码结果安全说明')).toHaveTextContent('已解码，未验证签名');
+  expect(within(results).getByLabelText('解码结果安全说明')).toHaveTextContent('签名尚未验证');
+  expect(within(results).getByLabelText('解码结果安全说明')).toHaveTextContent('请勿据此决定访问权限');
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
@@ -60,6 +65,25 @@ test('copies formatted Header and Payload through the shared safe clipboard help
   expect(writeText).toHaveBeenLastCalledWith(JSON.stringify({ alg: 'HS256', typ: 'JWT' }, null, 2));
   await user.click(screen.getByRole('button', { name: '复制 Payload' }));
   expect(writeText).toHaveBeenLastCalledWith(JSON.stringify({ sub: 'reader-123' }, null, 2));
+});
+
+test('resets copy success state when a new token is decoded', async () => {
+  const user = userEvent.setup();
+  setClipboard(vi.fn().mockResolvedValue(undefined));
+  render(<JwtTool />);
+  const input = screen.getByLabelText('JWT');
+
+  await user.type(input, token({ sub: 'token-a' }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+  await user.click(screen.getByRole('button', { name: '复制 Header' }));
+  expect(screen.getByRole('status')).toHaveTextContent('已复制');
+
+  await user.clear(input);
+  await user.type(input, token({ sub: 'token-b' }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  expect(screen.getByLabelText('Payload JSON')).toHaveTextContent('token-b');
+  expect(screen.queryByText('已复制')).not.toBeInTheDocument();
 });
 
 test('clears stale results when decoding fails', async () => {
@@ -95,7 +119,7 @@ test('describes an expired exp only as a comparison with the local clock', async
   await user.click(screen.getByRole('button', { name: '解码' }));
 
   expect(screen.getByText('时间已过（相对本地时钟）')).toBeInTheDocument();
-  expect(screen.getByText('已解码，未验证签名')).toBeInTheDocument();
+  expect(screen.getAllByText('已解码，未验证签名')).toHaveLength(2);
   expect(screen.queryByText(/有效|可信|安全|已验证/)).not.toBeInTheDocument();
 });
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ErrorView } from '../../components/ErrorView';
 import { copyText } from '../../lib/copy';
 import { decodeJwt, formatNumericDate, type DecodedJwt } from './jwt';
@@ -64,6 +64,10 @@ function DecodedResults({ value }: { value: DecodedJwt }) {
 
   return (
     <div className="jwt__results" aria-label="解码结果">
+      <p className="jwt__safety" aria-label="解码结果安全说明">
+        <strong>已解码，未验证签名</strong>
+        <span>。签名尚未验证，内容仅供查看，请勿据此决定访问权限。</span>
+      </p>
       <section className="jwt__section">
         <div className="jwt__section-head"><h3>Header</h3><CopyButton label="复制 Header" value={header} /></div>
         <pre aria-label="Header JSON">{header}</pre>
@@ -86,20 +90,21 @@ function DecodedResults({ value }: { value: DecodedJwt }) {
 
 export default function JwtTool() {
   const [input, setInput] = useState('');
-  const [decoded, setDecoded] = useState<DecodedJwt>();
+  const [decoded, setDecoded] = useState<Readonly<{ id: number; value: DecodedJwt }>>();
   const [error, setError] = useState('');
+  const resultSequence = useRef(0);
 
   function decode() {
     setDecoded(undefined);
     setError('');
     const result = decodeJwt(input);
-    if (result.ok) setDecoded(result.value);
+    if (result.ok) setDecoded({ id: ++resultSequence.current, value: result.value });
     else setError(result.error);
   }
 
   return (
     <div className="jwt">
-      <p className="jwt__safety"><strong>已解码，未验证签名</strong><span>。内容仅供查看，请勿据此决定访问权限。</span></p>
+      <p className="jwt__safety" aria-label="页面安全说明"><strong>已解码，未验证签名</strong><span>。内容仅供查看，请勿据此决定访问权限。</span></p>
       <label className="jwt__label" htmlFor="jwt-input">JWT</label>
       <textarea
         id="jwt-input"
@@ -111,7 +116,7 @@ export default function JwtTool() {
       />
       <div className="jwt__actions"><button onClick={decode}>解码</button></div>
       {error && <ErrorView message={error} />}
-      {decoded && <DecodedResults value={decoded} />}
+      {decoded && <DecodedResults key={decoded.id} value={decoded.value} />}
     </div>
   );
 }

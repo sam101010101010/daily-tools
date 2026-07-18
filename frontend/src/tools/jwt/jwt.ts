@@ -14,6 +14,10 @@ type DecodeObjectResult =
   | { ok: true; value: JsonObject }
   | { ok: false; error: string };
 
+// Keep parsed JSON within a browser-safe bound before recursive consumers such as
+// JSON.stringify render it. The root object is depth 0.
+const MAX_JSON_DEPTH = 100;
+
 function base64urlFromBytes(bytes: Uint8Array): string {
   let binary = '';
   bytes.forEach(byte => { binary += String.fromCharCode(byte); });
@@ -33,23 +37,29 @@ function decodeBase64url(segment: string): Uint8Array | undefined {
   }
 }
 
-function freezeJson(value: object): boolean {
-  const pending: object[] = [value];
+type JsonSafetyIssue = 'too-deep' | 'non-finite-number' | 'unsafe';
+
+function inspectAndFreezeJson(value: object): JsonSafetyIssue | undefined {
+  const pending: Array<{ value: object; depth: number }> = [{ value, depth: 0 }];
 
   try {
     while (pending.length > 0) {
-      const current = pending.pop()!;
+      const { value: current, depth } = pending.pop()!;
       Object.freeze(current);
 
       for (const child of Object.values(current)) {
-        if (child !== null && typeof child === 'object') pending.push(child);
+        if (typeof child === 'number' && !Number.isFinite(child)) return 'non-finite-number';
+        if (child !== null && typeof child === 'object') {
+          if (depth >= MAX_JSON_DEPTH) return 'too-deep';
+          pending.push({ value: child, depth: depth + 1 });
+        }
       }
     }
   } catch {
-    return false;
+    return 'unsafe';
   }
 
-  return true;
+  return undefined;
 }
 
 function decodeJsonObject(segment: string, label: 'Header' | 'Payload'): DecodeObjectResult {
@@ -74,7 +84,14 @@ function decodeJsonObject(segment: string, label: 'Header' | 'Payload'): DecodeO
     return { ok: false, error: `JWT ${label} 必须是 JSON 对象` };
   }
 
-  if (!freezeJson(value)) {
+  const safetyIssue = inspectAndFreezeJson(value);
+  if (safetyIssue === 'too-deep') {
+    return { ok: false, error: `JWT ${label} 嵌套层级超过 ${MAX_JSON_DEPTH}，无法安全显示` };
+  }
+  if (safetyIssue === 'non-finite-number') {
+    return { ok: false, error: `JWT ${label} 的 JSON 包含无法安全解析的非有限数字` };
+  }
+  if (safetyIssue === 'unsafe') {
     return { ok: false, error: `JWT ${label} 无法安全处理` };
   }
 
