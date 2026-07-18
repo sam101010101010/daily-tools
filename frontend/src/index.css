@@ -769,6 +769,24 @@ main section li {
   .jwt__claims div { grid-template-columns: 1fr; gap: 0.15rem; }
 }
 
+/* ---- Timestamp converter ---------------------------------------------- */
+
+.timestamp { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+.timestamp__controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem 1rem; }
+.timestamp__controls label { display: block; font-size: 0.85rem; }
+.timestamp__controls input, .timestamp__controls select { min-width: 0; width: 100%; margin-top: 0.3rem; }
+.timestamp__outputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+.timestamp__output { min-width: 0; padding: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); }
+.timestamp__output-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.82rem; font-weight: 700; }
+.timestamp__output-head button { margin-left: auto; padding: 0.25rem 0.55rem; color: var(--accent-strong); background: var(--surface); border-color: var(--border); font-size: 0.78rem; }
+.timestamp__output-head button:hover:not(:disabled) { color: var(--on-accent); }
+.timestamp__output code { display: block; overflow-wrap: anywhere; font-family: var(--mono); font-size: 0.9rem; color: var(--text); }
+.timestamp__output [role="status"] { display: block; margin-top: 0.4rem; color: var(--accent-strong); font-size: 0.8rem; }
+
+@media (max-width: 560px) {
+  .timestamp__controls, .timestamp__outputs { grid-template-columns: 1fr; }
+}
+
 /* SSL inspector — input row + verdict badges (matrix + cert chain styled with T9) */
 .ssl__form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
 .ssl__form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-muted); }
