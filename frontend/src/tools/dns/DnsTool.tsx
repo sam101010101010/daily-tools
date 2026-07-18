@@ -156,7 +156,7 @@ function QueryResult({ query }: { query: DnsQueryResult }) {
 }
 
 export default function DnsTool() {
-  const [domain, setDomain] = useState('');
+  const [domain, setDomain] = useState('example.com');
   const [resolver, setResolver] = useState<Resolver>('system');
   const [data, setData] = useState<DnsReport | null>(null);
   const [err, setErr] = useState('');

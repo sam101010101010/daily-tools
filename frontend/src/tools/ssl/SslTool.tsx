@@ -143,8 +143,8 @@ function CertCard({ cert, defaultOpen }: { cert: CertDetail; defaultOpen: boolea
 }
 
 export default function SslTool() {
-  const [host, setHost] = useState('');
-  const [port, setPort] = useState('');
+  const [host, setHost] = useState('example.com');
+  const [port, setPort] = useState('443');
   const [startTls, setStartTls] = useState('none');
   const [report, setReport] = useState<SslReport | null>(null);
   const [err, setErr] = useState('');

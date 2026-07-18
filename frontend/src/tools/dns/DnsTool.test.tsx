@@ -43,9 +43,16 @@ function report(over: Record<string, unknown> = {}) {
 
 async function runQuery(domain = 'example.com') {
   render(<DnsTool />);
+  await userEvent.clear(screen.getByLabelText(/domain/i));
   await userEvent.type(screen.getByLabelText(/domain/i), domain);
   await userEvent.click(screen.getByRole('button', { name: /查询/ }));
 }
+
+test('pre-fills a DNS example without querying it automatically', () => {
+  render(<DnsTool />);
+  expect(screen.getByLabelText('domain')).toHaveValue('example.com');
+  expect(mockedCallTool).not.toHaveBeenCalled();
+});
 
 test('defaults to the server system resolver and sends the chosen Cloudflare resolver', async () => {
   mockedCallTool.mockResolvedValue(report());
@@ -53,6 +60,7 @@ test('defaults to the server system resolver and sends the chosen Cloudflare res
 
   expect(screen.getByLabelText(/dns 服务器/i)).toHaveValue('system');
   expect((screen.getByRole('option', { name: '服务器系统 DNS' }) as HTMLOptionElement).selected).toBe(true);
+  await userEvent.clear(screen.getByLabelText(/domain/i));
   await userEvent.type(screen.getByLabelText(/domain/i), 'example.com');
   await userEvent.selectOptions(screen.getByLabelText(/dns 服务器/i), 'cloudflare');
   await userEvent.click(screen.getByRole('button', { name: /查询/ }));

@@ -10,13 +10,14 @@ import { ErrorView } from '../../components/ErrorView';
 
 type Mode = 'tree' | 'text' | 'table';
 const MODE_LABEL: Record<Mode, string> = { tree: '树', text: '文本', table: '表格' };
+const EXAMPLE_JSON = '{\n  "message": "Hello, Daily Tools!",\n  "enabled": true,\n  "items": [\n    "json",\n    "base64"\n  ]\n}';
 
 function btnCls(active: boolean) {
   return `json-workbench__btn${active ? ' is-active' : ''}`;
 }
 
 export default function JsonTool() {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(EXAMPLE_JSON);
   const [inputB, setInputB] = useState('');
   const [mode, setMode] = useState<Mode>('text');
   const [sortOn, setSortOn] = useState(false);
