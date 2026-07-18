@@ -46,6 +46,9 @@ test('decodes locally with formatted JSON, claims, readable NumericDates, and pe
   expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(1)}`)).toBeInTheDocument();
   expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(-1)}`)).toBeInTheDocument();
   const results = screen.getByLabelText('解码结果');
+  const pageSafetyNotice = screen.getByLabelText('页面安全说明');
+  expect(pageSafetyNotice).toHaveTextContent('已解码，未验证签名');
+  expect(pageSafetyNotice.compareDocumentPosition(screen.getByLabelText('JWT')) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   expect(screen.getAllByText('已解码，未验证签名')).toHaveLength(1);
   expect(within(results).queryByLabelText('解码结果安全说明')).not.toBeInTheDocument();
   expect(fetchSpy).not.toHaveBeenCalled();
