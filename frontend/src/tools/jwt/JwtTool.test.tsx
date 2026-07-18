@@ -15,6 +15,11 @@ function token(payload: Record<string, unknown>) {
   return `${base64url({ alg: 'HS256', typ: 'JWT' })}.${base64url(payload)}.c2ln`;
 }
 
+async function replaceToken(user: ReturnType<typeof userEvent.setup>, input: HTMLElement, value: string) {
+  await user.clear(input);
+  await user.type(input, value);
+}
+
 function setClipboard(writeText: (text: string) => Promise<void>) {
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
@@ -24,6 +29,19 @@ function setClipboard(writeText: (text: string) => Promise<void>) {
 
 afterEach(() => vi.unstubAllGlobals());
 
+test('pre-fills a safe JWT example without decoding it automatically', async () => {
+  const user = userEvent.setup();
+  render(<JwtTool />);
+
+  expect(screen.getByLabelText('JWT')).toHaveValue('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJleGFtcGxlLXVzZXIiLCJpYXQiOjE3MDAwMDAwMDB9.c2ln');
+  expect(screen.queryByLabelText('解码结果')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  expect(screen.getByLabelText('Header JSON')).toHaveTextContent('"typ": "JWT"');
+  expect(screen.getByLabelText('Payload JSON')).toHaveTextContent('"sub": "example-user"');
+});
+
 test('decodes locally with formatted JSON, claims, readable NumericDates, and persistent safety meaning', async () => {
   const user = userEvent.setup();
   const fetchSpy = vi.fn();
@@ -32,7 +50,7 @@ test('decodes locally with formatted JSON, claims, readable NumericDates, and pe
 
   expect(screen.getByLabelText('页面安全说明')).toHaveTextContent('已解码，未验证签名');
   expect(screen.getByLabelText('页面安全说明')).toHaveTextContent('请勿据此决定访问权限');
-  await user.type(screen.getByLabelText('JWT'), token({
+  await replaceToken(user, screen.getByLabelText('JWT'), token({
     iss: 'https://issuer.example', sub: 'reader-123', aud: ['daily-tools', 'mobile'], exp: 0, nbf: 1, iat: -1,
   }));
   await user.click(screen.getByRole('button', { name: '解码' }));
@@ -59,7 +77,7 @@ test('copies formatted Header and Payload through the shared safe clipboard help
   const writeText = vi.fn().mockResolvedValue(undefined);
   setClipboard(writeText);
   render(<JwtTool />);
-  await user.type(screen.getByLabelText('JWT'), token({ sub: 'reader-123' }));
+  await replaceToken(user, screen.getByLabelText('JWT'), token({ sub: 'reader-123' }));
   await user.click(screen.getByRole('button', { name: '解码' }));
 
   await user.click(screen.getByRole('button', { name: '复制 Header' }));
@@ -74,7 +92,7 @@ test('resets copy success state when a new token is decoded', async () => {
   render(<JwtTool />);
   const input = screen.getByLabelText('JWT');
 
-  await user.type(input, token({ sub: 'token-a' }));
+  await replaceToken(user, input, token({ sub: 'token-a' }));
   await user.click(screen.getByRole('button', { name: '解码' }));
   await user.click(screen.getByRole('button', { name: '复制 Header' }));
   expect(screen.getByRole('status')).toHaveTextContent('已复制');
@@ -91,7 +109,7 @@ test('clears stale results when decoding fails', async () => {
   const user = userEvent.setup();
   render(<JwtTool />);
   const input = screen.getByLabelText('JWT');
-  await user.type(input, token({ sub: 'reader-123' }));
+  await replaceToken(user, input, token({ sub: 'reader-123' }));
   await user.click(screen.getByRole('button', { name: '解码' }));
   expect(screen.getByLabelText('Header JSON')).toBeInTheDocument();
 
@@ -107,7 +125,7 @@ test('clears stale results when decoding fails', async () => {
 test('shows a neutral state when no registered claims are present', async () => {
   const user = userEvent.setup();
   render(<JwtTool />);
-  await user.type(screen.getByLabelText('JWT'), token({ custom: 'only' }));
+  await replaceToken(user, screen.getByLabelText('JWT'), token({ custom: 'only' }));
   await user.click(screen.getByRole('button', { name: '解码' }));
 
   expect(screen.getByText('没有可展示的注册 claims。')).toBeInTheDocument();
@@ -116,7 +134,7 @@ test('shows a neutral state when no registered claims are present', async () => 
 test('describes an expired exp only as a comparison with the local clock', async () => {
   const user = userEvent.setup();
   render(<JwtTool />);
-  await user.type(screen.getByLabelText('JWT'), token({ exp: 0 }));
+  await replaceToken(user, screen.getByLabelText('JWT'), token({ exp: 0 }));
   await user.click(screen.getByRole('button', { name: '解码' }));
 
   expect(screen.getByText('时间已过（相对本地时钟）')).toBeInTheDocument();
@@ -128,7 +146,7 @@ test('reports a clipboard write failure without losing the decoded result', asyn
   const user = userEvent.setup();
   setClipboard(vi.fn().mockRejectedValue(new Error('denied')));
   render(<JwtTool />);
-  await user.type(screen.getByLabelText('JWT'), token({ sub: 'reader-123' }));
+  await replaceToken(user, screen.getByLabelText('JWT'), token({ sub: 'reader-123' }));
   await user.click(screen.getByRole('button', { name: '解码' }));
 
   await user.click(screen.getByRole('button', { name: '复制 Header' }));
