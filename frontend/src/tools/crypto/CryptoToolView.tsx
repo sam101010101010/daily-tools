@@ -4,12 +4,13 @@ import { ErrorView } from '../../components/ErrorView';
 import AesForm from './AesForm';
 
 const ENCODING_PROTOCOLS = ['base64', 'base64-url', 'hex'];
+const EXAMPLE_TEXT = 'Hello, Daily Tools!';
 
 type DecodeResult = { ok: boolean; output?: string; error?: string };
 
 export default function CryptoToolView() {
   const [protocol, setProtocol] = useState('base64');
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(EXAMPLE_TEXT);
   const [out, setOut] = useState('');
   const [err, setErr] = useState('');
 

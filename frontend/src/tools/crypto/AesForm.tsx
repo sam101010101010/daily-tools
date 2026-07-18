@@ -9,6 +9,9 @@ interface CryptoResult {
 
 type Enc = 'utf8' | 'hex' | 'base64';
 const ENCS: Enc[] = ['utf8', 'hex', 'base64'];
+const EXAMPLE_KEY = '0123456789abcdef';
+const EXAMPLE_IV = '000102030405060708090a0b0c0d0e0f';
+const EXAMPLE_INPUT = 'Hello, Daily Tools!';
 
 // Non-secret preset config — algorithm shape only. The passphrase is secret and lives on the
 // backend (CryptoPresets); typing a preset name in the key field applies it and the request sends
@@ -49,11 +52,11 @@ export default function AesForm({ mode }: { mode: 'ECB' | 'CBC' | 'GCM' }) {
   const [padding, setPadding] = useState('PKCS5Padding');
   const [keySource, setKeySource] = useState('raw');
   const [keyHash, setKeyHash] = useState('MD5');
-  const [key, setKey] = useState('');
+  const [key, setKey] = useState(EXAMPLE_KEY);
   const [keyEnc, setKeyEnc] = useState<Enc>('utf8');
-  const [iv, setIv] = useState('');
+  const [iv, setIv] = useState(EXAMPLE_IV);
   const [ivEnc, setIvEnc] = useState<Enc>('hex');
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(EXAMPLE_INPUT);
   const [inputEnc, setInputEnc] = useState<Enc>('utf8');
   const [outputEnc, setOutputEnc] = useState<Enc>('base64');
 

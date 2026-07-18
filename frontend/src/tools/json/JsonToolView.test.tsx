@@ -6,9 +6,10 @@ import JsonTool from './JsonToolView';
 const set = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
-test('renders the input pane', () => {
+test('pre-fills a valid JSON example and renders its local preview', () => {
   render(<JsonTool />);
-  expect(screen.getByLabelText('json 输入')).toBeInTheDocument();
+  expect(screen.getByLabelText('json 输入')).toHaveValue('{\n  "message": "Hello, Daily Tools!",\n  "enabled": true,\n  "items": [\n    "json",\n    "base64"\n  ]\n}');
+  expect(screen.getByLabelText('json 输出')).toHaveTextContent('"message": "Hello, Daily Tools!"');
 });
 
 test('formats valid json in the text view and reports stats', () => {

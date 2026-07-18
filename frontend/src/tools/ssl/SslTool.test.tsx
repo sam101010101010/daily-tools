@@ -57,9 +57,17 @@ function report(over: Record<string, unknown> = {}) {
 
 async function runCheck() {
   render(<SslTool />);
+  await userEvent.clear(screen.getByLabelText(/host/i));
   await userEvent.type(screen.getByLabelText(/host/i), 'example.com');
   await userEvent.click(screen.getByRole('button', { name: /检查/ }));
 }
+
+test('pre-fills an SSL example without checking it automatically', () => {
+  render(<SslTool />);
+  expect(screen.getByLabelText('host')).toHaveValue('example.com');
+  expect(screen.getByLabelText('port')).toHaveValue('443');
+  expect(mockedCallTool).not.toHaveBeenCalled();
+});
 
 // ---- T8: input + verdict badges ----
 
@@ -88,6 +96,7 @@ test('a hard failure renders the ErrorView', async () => {
 test('sends the selected STARTTLS mode in the request body', async () => {
   mockedCallTool.mockResolvedValue(report());
   render(<SslTool />);
+  await userEvent.clear(screen.getByLabelText(/host/i));
   await userEvent.type(screen.getByLabelText(/host/i), 'mail.example.com');
   await userEvent.selectOptions(screen.getByLabelText(/starttls/i), 'smtp');
   await userEvent.click(screen.getByRole('button', { name: /检查/ }));
