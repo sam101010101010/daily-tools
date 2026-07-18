@@ -52,3 +52,14 @@ test('JWT decoder is a single local registry tool searchable by jwt and 令牌',
   expect(searchTools(registry, '令牌').map(t => t.id)).toEqual(['jwt']);
   await expect(jwt[0].load()).resolves.toHaveProperty('default');
 });
+
+test('timestamp converter is a single local registry tool searchable by time terms', async () => {
+  const timestamp = registry.filter(t => t.id === 'timestamp');
+  expect(timestamp).toHaveLength(1);
+  expect(timestamp[0]).toMatchObject({ id: 'timestamp', name: '时间戳转换器' });
+  expect(timestamp[0].backend).toBeUndefined();
+  expect(searchTools(registry, '时间戳').map(t => t.id)).toEqual(['timestamp']);
+  expect(searchTools(registry, 'timestamp').map(t => t.id)).toEqual(['timestamp']);
+  expect(searchTools(registry, 'Unix').map(t => t.id)).toEqual(['timestamp']);
+  await expect(timestamp[0].load()).resolves.toHaveProperty('default');
+});
