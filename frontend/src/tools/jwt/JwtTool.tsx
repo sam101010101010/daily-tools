@@ -45,10 +45,12 @@ function ClaimSummary({ payload }: { payload: DecodedJwt['payload'] }) {
       {claims.map(([key, label]) => {
         const value = payload[key];
         const readableDate = key === 'exp' || key === 'nbf' || key === 'iat' ? formatNumericDate(value) : undefined;
+        const expiredLocally = key === 'exp' && readableDate !== undefined
+          && typeof value === 'number' && value * 1_000 < Date.now();
         return (
           <div key={key}>
             <dt>{label}</dt>
-            <dd>{displayClaim(value)}{readableDate && <span className="jwt__date">可读时间：{readableDate}</span>}</dd>
+            <dd>{displayClaim(value)}{readableDate && <span className="jwt__date">可读时间：{readableDate}</span>}{expiredLocally && <span className="jwt__date">时间已过（相对本地时钟）</span>}</dd>
           </div>
         );
       })}

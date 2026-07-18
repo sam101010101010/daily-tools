@@ -87,3 +87,27 @@ test('shows a neutral state when no registered claims are present', async () => 
 
   expect(screen.getByText('没有可展示的注册 claims。')).toBeInTheDocument();
 });
+
+test('describes an expired exp only as a comparison with the local clock', async () => {
+  const user = userEvent.setup();
+  render(<JwtTool />);
+  await user.type(screen.getByLabelText('JWT'), token({ exp: 0 }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  expect(screen.getByText('时间已过（相对本地时钟）')).toBeInTheDocument();
+  expect(screen.getByText('已解码，未验证签名')).toBeInTheDocument();
+  expect(screen.queryByText(/有效|可信|安全|已验证/)).not.toBeInTheDocument();
+});
+
+test('reports a clipboard write failure without losing the decoded result', async () => {
+  const user = userEvent.setup();
+  setClipboard(vi.fn().mockRejectedValue(new Error('denied')));
+  render(<JwtTool />);
+  await user.type(screen.getByLabelText('JWT'), token({ sub: 'reader-123' }));
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  await user.click(screen.getByRole('button', { name: '复制 Header' }));
+
+  expect(screen.getByRole('status')).toHaveTextContent('复制失败，请手动复制。');
+  expect(screen.getByLabelText('Header JSON')).toBeInTheDocument();
+});
