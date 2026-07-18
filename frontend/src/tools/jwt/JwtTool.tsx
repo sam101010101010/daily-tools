@@ -64,10 +64,6 @@ function DecodedResults({ value }: { value: DecodedJwt }) {
 
   return (
     <div className="jwt__results" aria-label="解码结果">
-      <p className="jwt__safety" aria-label="解码结果安全说明">
-        <strong>已解码，未验证签名</strong>
-        <span>。签名尚未验证，内容仅供查看，请勿据此决定访问权限。</span>
-      </p>
       <section className="jwt__section">
         <div className="jwt__section-head"><h3>Header</h3><CopyButton label="复制 Header" value={header} /></div>
         <pre aria-label="Header JSON">{header}</pre>

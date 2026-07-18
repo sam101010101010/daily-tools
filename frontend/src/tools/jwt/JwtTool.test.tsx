@@ -46,10 +46,8 @@ test('decodes locally with formatted JSON, claims, readable NumericDates, and pe
   expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(1)}`)).toBeInTheDocument();
   expect(screen.getByText((_, element) => element?.textContent === `可读时间：${formatNumericDate(-1)}`)).toBeInTheDocument();
   const results = screen.getByLabelText('解码结果');
-  expect(screen.getByLabelText('页面安全说明')).not.toBe(within(results).getByLabelText('解码结果安全说明'));
-  expect(within(results).getByLabelText('解码结果安全说明')).toHaveTextContent('已解码，未验证签名');
-  expect(within(results).getByLabelText('解码结果安全说明')).toHaveTextContent('签名尚未验证');
-  expect(within(results).getByLabelText('解码结果安全说明')).toHaveTextContent('请勿据此决定访问权限');
+  expect(screen.getAllByText('已解码，未验证签名')).toHaveLength(1);
+  expect(within(results).queryByLabelText('解码结果安全说明')).not.toBeInTheDocument();
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
@@ -119,7 +117,7 @@ test('describes an expired exp only as a comparison with the local clock', async
   await user.click(screen.getByRole('button', { name: '解码' }));
 
   expect(screen.getByText('时间已过（相对本地时钟）')).toBeInTheDocument();
-  expect(screen.getAllByText('已解码，未验证签名')).toHaveLength(2);
+  expect(screen.getAllByText('已解码，未验证签名')).toHaveLength(1);
   expect(screen.queryByText(/有效|可信|安全|已验证/)).not.toBeInTheDocument();
 });
 
