@@ -8,7 +8,7 @@ function base64url(value: string): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function compactToken(header: unknown, payload: unknown, signature = 'signature'): string {
+function compactToken(header: unknown, payload: unknown, signature = 'c2ln'): string {
   return `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(payload))}.${signature}`;
 }
 
@@ -16,7 +16,7 @@ test('decodes a compact HS256 token and preserves its raw signature segment', ()
   const token = compactToken(
     { alg: 'HS256', typ: 'JWT' },
     { sub: '123', exp: 1_763_462_400 },
-    'raw-signature_segment',
+    'cmF3LXNpZw',
   );
 
   expect(decodeJwt(token)).toEqual({
@@ -24,7 +24,7 @@ test('decodes a compact HS256 token and preserves its raw signature segment', ()
     value: {
       header: { alg: 'HS256', typ: 'JWT' },
       payload: { sub: '123', exp: 1_763_462_400 },
-      signature: 'raw-signature_segment',
+      signature: 'cmF3LXNpZw',
     },
   });
 });
@@ -37,7 +37,7 @@ test('decodes Unicode JSON, unpadded base64url, and surrounding whitespace', () 
     value: {
       header: { alg: 'HS256' },
       payload: { message: '你好，世界 👋' },
-      signature: 'signature',
+      signature: 'c2ln',
     },
   });
 });
@@ -65,6 +65,17 @@ test.each([
 
 test('rejects an invalid base64url signature segment without parsing it as JSON', () => {
   expect(decodeJwt(`${base64url('{}')}.${base64url('{}')}.not%base64url`)).toEqual({
+    ok: false,
+    error: 'JWT 签名不是合法的 Base64URL',
+  });
+});
+
+test.each([
+  ['an empty segment', ''],
+  ['an impossible base64url length', 'a'],
+  ['non-canonical base64url padding bits', 'AB'],
+])('rejects a signature with %s', (_description, signature) => {
+  expect(decodeJwt(`${base64url('{}')}.${base64url('{}')}.${signature}`)).toEqual({
     ok: false,
     error: 'JWT 签名不是合法的 Base64URL',
   });
@@ -119,6 +130,18 @@ test('returns immutable decoded values', () => {
   expect(Object.isFrozen(result.value.payload)).toBe(true);
   expect(Object.isFrozen(result.value.header.nested)).toBe(true);
   expect(Object.isFrozen(result.value.payload.roles)).toBe(true);
+});
+
+test('decodes deeply nested valid JSON without throwing outside its result union', () => {
+  const depth = 10_000;
+  const payload = `${'{"nested":'.repeat(depth)}0${'}'.repeat(depth)}`;
+  const token = `${base64url('{"alg":"HS256"}')}.${base64url(payload)}.c2ln`;
+
+  const result = decodeJwt(token);
+
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(Object.isFrozen(result.value.payload)).toBe(true);
 });
 
 test('formats finite NumericDate values including zero, negatives, and fractions', () => {

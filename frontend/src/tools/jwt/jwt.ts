@@ -33,11 +33,23 @@ function decodeBase64url(segment: string): Uint8Array | undefined {
   }
 }
 
-function freezeJson(value: unknown): void {
-  if (value !== null && typeof value === 'object') {
-    Object.values(value).forEach(freezeJson);
-    Object.freeze(value);
+function freezeJson(value: object): boolean {
+  const pending: object[] = [value];
+
+  try {
+    while (pending.length > 0) {
+      const current = pending.pop()!;
+      Object.freeze(current);
+
+      for (const child of Object.values(current)) {
+        if (child !== null && typeof child === 'object') pending.push(child);
+      }
+    }
+  } catch {
+    return false;
   }
+
+  return true;
 }
 
 function decodeJsonObject(segment: string, label: 'Header' | 'Payload'): DecodeObjectResult {
@@ -62,7 +74,10 @@ function decodeJsonObject(segment: string, label: 'Header' | 'Payload'): DecodeO
     return { ok: false, error: `JWT ${label} 必须是 JSON 对象` };
   }
 
-  freezeJson(value);
+  if (!freezeJson(value)) {
+    return { ok: false, error: `JWT ${label} 无法安全处理` };
+  }
+
   return { ok: true, value: value as JsonObject };
 }
 
@@ -74,15 +89,15 @@ export function decodeJwt(input: string): DecodeJwtResult {
     return Object.freeze({ ok: false as const, error: 'JWT 必须是三段紧凑 JWS 格式' });
   }
 
-  if (!/^[A-Za-z0-9_-]*$/.test(signature)) {
-    return Object.freeze({ ok: false as const, error: 'JWT 签名不是合法的 Base64URL' });
-  }
-
   const header = decodeJsonObject(headerSegment, 'Header');
   if (!header.ok) return Object.freeze(header);
 
   const payload = decodeJsonObject(payloadSegment, 'Payload');
   if (!payload.ok) return Object.freeze(payload);
+
+  if (!decodeBase64url(signature)) {
+    return Object.freeze({ ok: false as const, error: 'JWT 签名不是合法的 Base64URL' });
+  }
 
   return Object.freeze({
     ok: true as const,
