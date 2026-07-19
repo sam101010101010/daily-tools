@@ -6,6 +6,7 @@ import { dnsMeta } from '../tools/dns/meta';
 import { jwtMeta } from '../tools/jwt/meta';
 import { timestampMeta } from '../tools/timestamp/meta';
 import { urlMeta } from '../tools/url/meta';
+import { hashMeta } from '../tools/hash/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -15,6 +16,7 @@ export const tools: ToolMeta[] = [
   jwtMeta,
   timestampMeta,
   urlMeta,
+  hashMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {

@@ -74,3 +74,20 @@ test('URL codec is a single local registry tool searchable by URL terms', async 
   expect(searchTools(registry, 'encode').map(t => t.id)).toEqual(['url']);
   await expect(url[0].load()).resolves.toHaveProperty('default');
 });
+
+test('hash checksum tool is a single local registry entry searchable by Chinese and English terms', async () => {
+  const hash = registry.filter(t => t.id === 'hash');
+  expect(hash).toHaveLength(1);
+  expect(hash[0]).toMatchObject({
+    id: 'hash',
+    name: '哈希 / 文件校验',
+    category: '编码',
+    keywords: expect.arrayContaining(['hash', 'checksum', 'MD5', 'SHA', '校验和', '文件']),
+  });
+  expect(hash[0].backend).toBeUndefined();
+  expect(searchTools(registry, 'hash').map(t => t.id)).toContain('hash');
+  expect(searchTools(registry, 'checksum').map(t => t.id)).toContain('hash');
+  expect(searchTools(registry, '校验和').map(t => t.id)).toContain('hash');
+  expect(searchTools(registry, '文件').map(t => t.id)).toContain('hash');
+  await expect(hash[0].load()).resolves.toHaveProperty('default');
+});
