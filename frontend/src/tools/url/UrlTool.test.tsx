@@ -15,6 +15,26 @@ test('pre-fills a public URL component example without a network request', () =>
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
+test('never requests the network while running local URL actions', async () => {
+  const user = userEvent.setup();
+  const fetchSpy = vi.fn();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('fetch', fetchSpy);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  render(<UrlTool />);
+
+  await user.click(screen.getByRole('button', { name: '编码' }));
+  await user.click(screen.getByRole('button', { name: '复制输出' }));
+  await user.clear(screen.getByLabelText('输入'));
+  await user.type(screen.getByLabelText('输入'), 'a%2Bb');
+  await user.click(screen.getByRole('button', { name: '解码' }));
+  await user.clear(screen.getByLabelText('输入'));
+  await user.type(screen.getByLabelText('输入'), '%E0%A4%A');
+  await user.click(screen.getByRole('button', { name: '解码' }));
+
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
 test('encodes and decodes the editable input as a URL component', async () => {
   const user = userEvent.setup();
   render(<UrlTool />);
