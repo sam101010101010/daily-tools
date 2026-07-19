@@ -3,10 +3,13 @@ import { startHashJob } from './hashWorkerClient';
 
 class MockWorker {
   static instances: MockWorker[] = [];
+  static postMessageError: Error | undefined;
 
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
-  postMessage = vi.fn();
+  postMessage = vi.fn((_message: unknown) => {
+    if (MockWorker.postMessageError) throw MockWorker.postMessageError;
+  });
   terminate = vi.fn();
 
   constructor(..._args: unknown[]) {
@@ -25,6 +28,7 @@ class MockWorker {
 describe('hash worker client', () => {
   beforeEach(() => {
     MockWorker.instances = [];
+    MockWorker.postMessageError = undefined;
     vi.stubGlobal('Worker', MockWorker);
   });
 
@@ -87,6 +91,68 @@ describe('hash worker client', () => {
 
     expect(worker.terminate).toHaveBeenCalledOnce();
     expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('does not let an old cancellation handle terminate a replacement worker', () => {
+    const cancelOldJob = startHashJob(
+      { algorithm: 'sha256', source: { kind: 'text', text: 'old' } },
+      { onProgress: vi.fn(), onSuccess: vi.fn(), onError: vi.fn() },
+    );
+    const oldWorker = MockWorker.instances[0];
+
+    startHashJob(
+      { algorithm: 'sha256', source: { kind: 'text', text: 'new' } },
+      { onProgress: vi.fn(), onSuccess: vi.fn(), onError: vi.fn() },
+    );
+    const newWorker = MockWorker.instances[1];
+
+    cancelOldJob();
+
+    expect(oldWorker.terminate).toHaveBeenCalledOnce();
+    expect(newWorker.terminate).not.toHaveBeenCalled();
+  });
+
+  it('reports a worker constructor failure without throwing and permits a later job', () => {
+    const onError = vi.fn();
+    class FailingWorker {
+      constructor() {
+        throw new Error('worker unavailable');
+      }
+    }
+    vi.stubGlobal('Worker', FailingWorker);
+
+    expect(() => startHashJob(
+      { algorithm: 'sha256', source: { kind: 'text', text: 'abc' } },
+      { onProgress: vi.fn(), onSuccess: vi.fn(), onError },
+    )).not.toThrow();
+    expect(onError).toHaveBeenCalledWith('本地哈希计算失败，请重试。');
+
+    vi.stubGlobal('Worker', MockWorker);
+    startHashJob(
+      { algorithm: 'sha256', source: { kind: 'text', text: 'recovered' } },
+      { onProgress: vi.fn(), onSuccess: vi.fn(), onError: vi.fn() },
+    );
+    expect(MockWorker.instances).toHaveLength(1);
+  });
+
+  it('terminates and clears the worker when the start message throws', () => {
+    const onError = vi.fn();
+    MockWorker.postMessageError = new Error('cannot clone source');
+
+    expect(() => startHashJob(
+      { algorithm: 'sha256', source: { kind: 'text', text: 'abc' } },
+      { onProgress: vi.fn(), onSuccess: vi.fn(), onError },
+    )).not.toThrow();
+    const failedWorker = MockWorker.instances[0];
+    expect(failedWorker.terminate).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith('本地哈希计算失败，请重试。');
+
+    MockWorker.postMessageError = undefined;
+    startHashJob(
+      { algorithm: 'sha256', source: { kind: 'text', text: 'recovered' } },
+      { onProgress: vi.fn(), onSuccess: vi.fn(), onError: vi.fn() },
+    );
+    expect(failedWorker.terminate).toHaveBeenCalledOnce();
   });
 
   it('terminates the worker after a final success message', () => {

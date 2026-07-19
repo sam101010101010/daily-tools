@@ -14,16 +14,32 @@ export type HashJobHandlers = Readonly<{
 
 let currentJob: Readonly<{ jobId: string; worker: Worker }> | undefined;
 let nextJobId = 0;
+const HASH_WORKER_ERROR = '本地哈希计算失败，请重试。';
+
+function terminateWorker(worker: Worker): void {
+  try {
+    worker.terminate();
+  } catch {
+    // Cleanup must still clear client state and expose the approved UI error.
+  }
+}
 
 function cancelCurrentJob(): void {
-  currentJob?.worker.terminate();
+  const worker = currentJob?.worker;
   currentJob = undefined;
+  if (worker) terminateWorker(worker);
 }
 
 export function startHashJob(request: HashJobRequest, handlers: HashJobHandlers): () => void {
   cancelCurrentJob();
 
-  const worker = new Worker(new URL('./hash.worker.ts', import.meta.url), { type: 'module' });
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL('./hash.worker.ts', import.meta.url), { type: 'module' });
+  } catch {
+    handlers.onError(HASH_WORKER_ERROR);
+    return () => undefined;
+  }
   const jobId = `hash-job-${++nextJobId}`;
   currentJob = { jobId, worker };
 
@@ -57,9 +73,9 @@ export function startHashJob(request: HashJobRequest, handlers: HashJobHandlers)
 
   worker.onerror = () => {
     if (currentJob?.jobId === jobId) {
-      worker.terminate();
       currentJob = undefined;
-      handlers.onError('本地哈希计算失败，请重试。');
+      terminateWorker(worker);
+      handlers.onError(HASH_WORKER_ERROR);
     }
   };
 
@@ -69,7 +85,14 @@ export function startHashJob(request: HashJobRequest, handlers: HashJobHandlers)
     algorithm: request.algorithm,
     source: request.source,
   };
-  worker.postMessage(startMessage);
+  try {
+    worker.postMessage(startMessage);
+  } catch {
+    if (currentJob?.jobId === jobId) currentJob = undefined;
+    terminateWorker(worker);
+    handlers.onError(HASH_WORKER_ERROR);
+    return () => undefined;
+  }
 
   return () => {
     if (currentJob?.jobId === jobId) {

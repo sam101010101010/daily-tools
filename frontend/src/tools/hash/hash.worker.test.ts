@@ -23,6 +23,29 @@ async function collectMessages(
 }
 
 describe('hash worker', () => {
+  it('hashes empty UTF-8 text and reports zero-byte completion', async () => {
+    const messages = await collectMessages({
+      type: 'start',
+      jobId: 'empty-text',
+      algorithm: 'sha256',
+      source: { kind: 'text', text: '' },
+    });
+
+    expect(messages).toEqual([
+      {
+        type: 'progress',
+        jobId: 'empty-text',
+        completedBytes: 0,
+        totalBytes: 0,
+      },
+      {
+        type: 'done',
+        jobId: 'empty-text',
+        digest: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      },
+    ]);
+  });
+
   it.each(Object.entries(ABC_DIGESTS))('hashes text abc with %s', async (algorithm, digest) => {
     const messages = await collectMessages({
       type: 'start',

@@ -182,6 +182,22 @@ test('renders ErrorView when the worker reports an error', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent('本地哈希计算失败，请重试。');
 });
 
+test('recovers from a synchronous worker startup error callback', async () => {
+  const user = userEvent.setup();
+  mockedStartHashJob.mockImplementationOnce((_request, handlers) => {
+    handlers.onError('本地哈希计算失败，请重试。');
+    return vi.fn();
+  });
+  render(<HashTool />);
+
+  await user.click(screen.getByRole('button', { name: '计算哈希' }));
+
+  expect(screen.getByRole('alert')).toHaveTextContent('本地哈希计算失败，请重试。');
+  expect(screen.queryByRole('button', { name: '取消' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('输入来源')).toBeEnabled();
+  expect(screen.getByLabelText('哈希算法')).toBeEnabled();
+});
+
 test.each(['md5', 'sha1'])('warns that %s is legacy in both its option and its result', async (algorithm) => {
   const user = userEvent.setup();
   render(<HashTool />);
