@@ -29,4 +29,13 @@ describe('design tokens are the single source of truth', () => {
         offenders.map((o) => `  L${o.n}: ${o.line}`).join('\n'),
     ).toEqual([]);
   });
+
+  it('defines responsive, token-based hash tool surfaces with a wrapping digest', () => {
+    expect(css).toMatch(/\.hash__controls\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.hash__file-summary\s*\{[^}]*var\(--surface-sunken\)/);
+    expect(css).toMatch(/\.hash__progress\s*\{[^}]*var\(--accent\)/);
+    expect(css).toMatch(/\.hash__result\s*\{[^}]*var\(--border\)/);
+    expect(css).toMatch(/\.hash__digest\s*\{[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/@media \(max-width: 560px\)\s*\{[\s\S]*\.hash__controls\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+  });
 });
