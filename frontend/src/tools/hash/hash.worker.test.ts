@@ -12,6 +12,8 @@ const ABC_DIGESTS = {
     'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f',
 } as const;
 
+const LARGE_FILE_SHA256 = 'acd560a1e1d523c090ab93aed616d154b7b5e8206a153cced729d83f2c7dcfc3';
+
 async function collectMessages(
   request: Parameters<typeof runHashWorkerJob>[0],
 ): Promise<HashWorkerMessage[]> {
@@ -36,6 +38,17 @@ describe('hash worker', () => {
       totalBytes: 3,
     });
     expect(messages).toContainEqual({ type: 'done', jobId: algorithm, digest });
+  });
+
+  it.each(Object.entries(ABC_DIGESTS))('hashes File abc with %s', async (algorithm, digest) => {
+    const messages = await collectMessages({
+      type: 'start',
+      jobId: `file-${algorithm}`,
+      algorithm: algorithm as keyof typeof ABC_DIGESTS,
+      source: { kind: 'file', file: new File(['abc'], 'abc.txt') },
+    });
+
+    expect(messages).toContainEqual({ type: 'done', jobId: `file-${algorithm}`, digest });
   });
 
   it('hashes an empty file and reports completion', async () => {
@@ -83,7 +96,11 @@ describe('hash worker', () => {
       completedBytes: file.size,
       totalBytes: file.size,
     });
-    expect(messages.some((message) => message.type === 'done')).toBe(true);
+    expect(messages).toContainEqual({
+      type: 'done',
+      jobId: 'large',
+      digest: LARGE_FILE_SHA256,
+    });
   });
 
   it('returns only the approved Chinese message when reading fails', async () => {

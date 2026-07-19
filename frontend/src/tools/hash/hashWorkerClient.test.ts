@@ -16,6 +16,10 @@ class MockWorker {
   emit(data: unknown): void {
     this.onmessage?.({ data } as MessageEvent);
   }
+
+  emitError(): void {
+    this.onerror?.({} as ErrorEvent);
+  }
 }
 
 describe('hash worker client', () => {
@@ -96,5 +100,23 @@ describe('hash worker client', () => {
     worker.emit({ type: 'done', jobId, digest: 'a'.repeat(64) });
 
     expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+
+  it('terminates after a native worker error and ignores later matching messages', () => {
+    const onSuccess = vi.fn();
+    const onError = vi.fn();
+    startHashJob(
+      { algorithm: 'sha256', source: { kind: 'text', text: 'abc' } },
+      { onProgress: vi.fn(), onSuccess, onError },
+    );
+    const worker = MockWorker.instances[0];
+    const [{ jobId }] = worker.postMessage.mock.calls.map(([message]) => message) as [{ jobId: string }];
+
+    worker.emitError();
+    worker.emit({ type: 'done', jobId, digest: 'a'.repeat(64) });
+
+    expect(onError).toHaveBeenCalledWith('本地哈希计算失败，请重试。');
+    expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 });

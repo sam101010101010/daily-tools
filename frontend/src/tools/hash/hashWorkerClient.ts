@@ -57,6 +57,8 @@ export function startHashJob(request: HashJobRequest, handlers: HashJobHandlers)
 
   worker.onerror = () => {
     if (currentJob?.jobId === jobId) {
+      worker.terminate();
+      currentJob = undefined;
       handlers.onError('本地哈希计算失败，请重试。');
     }
   };
