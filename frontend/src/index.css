@@ -787,6 +787,27 @@ main section li {
   .timestamp__controls, .timestamp__outputs { grid-template-columns: 1fr; }
 }
 
+/* ---- URL component codec ---------------------------------------------- */
+
+.url { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.url__hint { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+.url__hint code { font-family: var(--mono); color: var(--text); }
+.url__label { color: var(--text-muted); }
+.url textarea { min-width: 0; margin: -0.5rem 0 0; overflow-wrap: anywhere; }
+.url__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.url__actions button + button { margin-left: 0; }
+.url__result { min-width: 0; padding: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); }
+.url__result-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.url__result-head h3 { margin: 0; font-size: 0.95rem; }
+.url__result-head button { margin-left: auto; padding: 0.25rem 0.55rem; color: var(--accent-strong); background: var(--surface); border-color: var(--border); font-size: 0.78rem; }
+.url__result-head button:hover:not(:disabled) { color: var(--on-accent); }
+.url__result pre { margin: 0.55rem 0 0; max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; font-family: var(--mono); color: var(--text); }
+.url__copy-status { display: block; margin-top: 0.4rem; color: var(--accent-strong); font-size: 0.8rem; }
+
+@media (max-width: 560px) {
+  .url__result-head button { margin-left: 0; }
+}
+
 /* SSL inspector — input row + verdict badges (matrix + cert chain styled with T9) */
 .ssl__form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
 .ssl__form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-muted); }
