@@ -63,3 +63,14 @@ test('timestamp converter is a single local registry tool searchable by time ter
   expect(searchTools(registry, 'Unix').map(t => t.id)).toEqual(['timestamp']);
   await expect(timestamp[0].load()).resolves.toHaveProperty('default');
 });
+
+test('URL codec is a single local registry tool searchable by URL terms', async () => {
+  const url = registry.filter(t => t.id === 'url');
+  expect(url).toHaveLength(1);
+  expect(url[0]).toMatchObject({ id: 'url', name: 'URL 编解码器' });
+  expect(url[0].backend).toBeUndefined();
+  expect(searchTools(registry, 'URL').map(t => t.id)).toEqual(['url']);
+  expect(searchTools(registry, '网址').map(t => t.id)).toEqual(['url']);
+  expect(searchTools(registry, 'encode').map(t => t.id)).toEqual(['url']);
+  await expect(url[0].load()).resolves.toHaveProperty('default');
+});
