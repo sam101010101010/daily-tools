@@ -1,12 +1,15 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { copyText } from '../../lib/copy';
 import { startHashJob } from './hashWorkerClient';
 import HashTool from './HashTool';
 
 vi.mock('./hashWorkerClient', () => ({ startHashJob: vi.fn() }));
+vi.mock('../../lib/copy', () => ({ copyText: vi.fn() }));
 
 const mockedStartHashJob = vi.mocked(startHashJob);
+const mockedCopyText = vi.mocked(copyText);
 const SHA256 = 'a'.repeat(64);
 
 type JobHandlers = Parameters<typeof startHashJob>[1];
@@ -21,6 +24,7 @@ function latestCancel(): ReturnType<typeof startHashJob> {
 
 beforeEach(() => {
   mockedStartHashJob.mockImplementation(() => vi.fn());
+  mockedCopyText.mockResolvedValue({ ok: true });
 });
 
 afterEach(() => {
@@ -83,8 +87,6 @@ test('shows the source size, accessible progress, and a cancel button while a jo
 
 test('renders a lowercase digest, supports copying it, and announces copy status', async () => {
   const user = userEvent.setup();
-  const writeText = vi.fn().mockResolvedValue(undefined);
-  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   render(<HashTool />);
 
   await user.click(screen.getByRole('button', { name: '计算哈希' }));
@@ -92,8 +94,28 @@ test('renders a lowercase digest, supports copying it, and announces copy status
 
   expect(screen.getByLabelText('哈希结果')).toHaveTextContent(SHA256);
   await user.click(screen.getByRole('button', { name: '复制哈希结果' }));
-  expect(writeText).toHaveBeenCalledWith(SHA256);
+  expect(mockedCopyText).toHaveBeenCalledWith(SHA256);
   expect(screen.getByRole('status')).toHaveTextContent('已复制');
+});
+
+test('ignores a stale copy completion after a new digest appears', async () => {
+  const user = userEvent.setup();
+  let resolveCopy!: (value: { ok: true }) => void;
+  mockedCopyText.mockReturnValueOnce(new Promise(resolve => { resolveCopy = resolve; }));
+  render(<HashTool />);
+
+  await user.click(screen.getByRole('button', { name: '计算哈希' }));
+  await act(async () => latestHandlers().onSuccess({ algorithm: 'sha256', digest: SHA256 }));
+  await user.click(screen.getByRole('button', { name: '复制哈希结果' }));
+
+  await user.clear(screen.getByLabelText('文本内容'));
+  await user.type(screen.getByLabelText('文本内容'), 'replacement');
+  await user.click(screen.getByRole('button', { name: '计算哈希' }));
+  await act(async () => latestHandlers().onSuccess({ algorithm: 'sha256', digest: 'b'.repeat(64) }));
+  await act(async () => resolveCopy({ ok: true }));
+
+  expect(screen.getByLabelText('哈希结果')).toHaveTextContent('b'.repeat(64));
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
 
 test('cancels the old job when replacing a file', async () => {

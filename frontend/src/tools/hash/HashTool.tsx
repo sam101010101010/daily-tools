@@ -101,7 +101,9 @@ export default function HashTool() {
 
   async function copyResult() {
     if (!result) return;
+    const version = jobVersion.current;
     const copied = await copyText(result.digest);
+    if (jobVersion.current !== version) return;
     setCopyStatus(copied.ok ? '已复制' : copied.message);
   }
 
