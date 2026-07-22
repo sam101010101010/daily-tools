@@ -56,6 +56,20 @@ test('returns global matches in index order and preserves unmatched captures as 
   });
 });
 
+test('returns the no-match evaluation contract for an unmatched pattern', () => {
+  expect(evaluateRegex({
+    pattern: 'z',
+    flags: 'ig',
+    text: 'abc',
+    replacement: '',
+  })).toEqual({
+    kind: 'no-match',
+    flags: 'gi',
+    matches: [],
+    truncated: false,
+  });
+});
+
 test('handles empty patterns, Unicode, zero-length global matches, and the 500-match limit', () => {
   expect(evaluateRegex({ pattern: '', flags: 'g', text: 'ab', replacement: '' })).toMatchObject({
     kind: 'success',
