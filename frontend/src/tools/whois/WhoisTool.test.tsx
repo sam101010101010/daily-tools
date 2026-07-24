@@ -90,12 +90,15 @@ test('renders a readable found report, keeps raw JSON closed, and copies its exa
   expect(screen.getByText('expiration')).toBeInTheDocument();
   expect(screen.getAllByText('Example Registrar')).not.toHaveLength(0);
   expect(screen.getByText('a.iana-servers.net')).toBeInTheDocument();
-  expect(screen.getByText('b.iana-servers.net')).toBeInTheDocument();
+  const nameserverWithoutUnicode = screen.getByText('b.iana-servers.net').closest('li');
+  expect(nameserverWithoutUnicode).toHaveTextContent('Unicode 名称：未公开');
   expect(screen.getByText('Terms of Service')).toBeInTheDocument();
 
   const rawDetails = screen.getByText('原始 RDAP JSON').closest('details');
   expect(rawDetails).not.toHaveAttribute('open');
 
+  await user.click(screen.getByText('原始 RDAP JSON'));
+  expect(rawDetails).toHaveAttribute('open');
   await user.click(screen.getByRole('button', { name: '复制原始 JSON' }));
 
   expect(mockedCopyText).toHaveBeenCalledWith(rawJson);

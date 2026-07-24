@@ -168,7 +168,7 @@ export default function WhoisTool() {
                 {report.nameservers.map((nameserver, index) => (
                   <li key={`${nameserver.ldhName}-${index}`}>
                     <strong>{display(nameserver.ldhName)}</strong>
-                    {nameserver.unicodeName && <span>{nameserver.unicodeName}</span>}
+                    <span>Unicode 名称：{display(nameserver.unicodeName)}</span>
                     <span>
                       状态：{nameserver.statuses.length > 0
                         ? nameserver.statuses.join('、')
