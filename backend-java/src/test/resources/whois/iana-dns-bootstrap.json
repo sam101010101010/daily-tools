@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "services": [
+    [["com"], ["https://rdap.com.example/rdap/"]],
+    [["uk"], ["https://rdap.uk.example/rdap/"]],
+    [["co.uk"], ["https://rdap.couk.example/rdap/"]]
+  ]
+}
