@@ -7,6 +7,7 @@ import { jwtMeta } from '../tools/jwt/meta';
 import { timestampMeta } from '../tools/timestamp/meta';
 import { urlMeta } from '../tools/url/meta';
 import { hashMeta } from '../tools/hash/meta';
+import { regexpMeta } from '../tools/regexp/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -17,6 +18,7 @@ export const tools: ToolMeta[] = [
   timestampMeta,
   urlMeta,
   hashMeta,
+  regexpMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {

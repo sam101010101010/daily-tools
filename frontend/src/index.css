@@ -941,3 +941,275 @@ main section li {
 .ssl__cert-body dt { color: var(--text-muted); }
 .ssl__cert-body dd { margin: 0; }
 .ssl__fp { font-family: var(--mono); font-size: 0.8rem; word-break: break-all; }
+
+/* ---- JavaScript regexp tester ----------------------------------------- */
+
+.regexp {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.regexp__engine,
+.regexp__empty,
+.regexp__truncated,
+.regexp > [role="status"] {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.regexp__engine {
+  padding: 0.7rem 0.8rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.regexp__engine code,
+.regexp__match code {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.regexp__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.regexp__field > label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.regexp__field input,
+.regexp__field textarea {
+  min-width: 0;
+  width: 100%;
+}
+
+.regexp__field textarea {
+  height: 13rem;
+  min-height: 13rem;
+  max-height: 13rem;
+  margin: 0;
+  resize: none;
+  overflow: auto;
+}
+
+.regexp__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.8rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.regexp__flags legend {
+  padding: 0 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.regexp__flags label {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.regexp__flags label:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+  font-weight: 700;
+}
+
+.regexp__flags input {
+  accent-color: var(--accent);
+}
+
+.regexp__flags input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.regexp__flags code {
+  color: var(--accent-strong);
+  font-family: var(--mono);
+}
+
+.regexp__results,
+.regexp__replacement {
+  min-width: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.regexp__results > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.regexp__results > header p {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.regexp__results > header button {
+  margin-left: auto;
+}
+
+.regexp__truncated {
+  margin-top: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  color: var(--accent-strong);
+  background: var(--accent-weak);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-weight: 650;
+}
+
+.regexp__highlight {
+  height: 13rem;
+  min-height: 13rem;
+  max-height: 13rem;
+  margin: 0.8rem 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.regexp__highlight mark {
+  padding: 0 0.08rem;
+  color: var(--text);
+  background: var(--accent-weak);
+  border-bottom: 0.18rem solid var(--accent);
+  border-radius: 0.15rem;
+  font-weight: 700;
+}
+
+.regexp__matches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+main section .regexp__match {
+  min-width: 0;
+  padding: 0.8rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.regexp__match > p {
+  margin: 0 0 0.45rem;
+  color: var(--text);
+}
+
+.regexp__match > p:last-child {
+  margin-bottom: 0;
+}
+
+.regexp__match dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem;
+  margin: 0.55rem 0;
+  padding: 0;
+  border: 0;
+}
+
+.regexp__match dl > div {
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.regexp__match dt {
+  font-size: 0.78rem;
+}
+
+.regexp__match dd {
+  min-width: 0;
+  margin: 0.15rem 0 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.regexp__replacement h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.regexp__replacement pre {
+  max-width: 100%;
+  margin: 0.55rem 0 0.7rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.regexp__replacement button {
+  margin-left: 0;
+}
+
+.regexp > [role="status"] {
+  padding-left: 0.65rem;
+  border-left: 3px solid var(--accent);
+}
+
+@media (max-width: 560px) {
+  .regexp__flags {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .regexp__flags label {
+    width: 100%;
+  }
+
+  .regexp__results > header {
+    align-items: stretch;
+  }
+
+  .regexp__results > header button {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .regexp__matches {
+    grid-template-columns: 1fr;
+  }
+
+  .regexp__replacement button {
+    width: 100%;
+  }
+}
