@@ -3,6 +3,8 @@ package dev.sam.dailytools.tools.whois;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.sam.dailytools.common.ToolException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -14,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+@Service
 public class RdapBootstrapResolver {
   public static final URI IANA_DNS_BOOTSTRAP = URI.create("https://data.iana.org/rdap/dns.json");
   private static final Duration CACHE_TTL = Duration.ofHours(24);
@@ -25,7 +28,12 @@ public class RdapBootstrapResolver {
   private List<Service> cachedServices;
   private Instant expiresAt = Instant.EPOCH;
 
-  public RdapBootstrapResolver(RdapHttpClient client, Clock clock) {
+  @Autowired
+  public RdapBootstrapResolver(RdapHttpClient client) {
+    this(client, Clock.systemUTC());
+  }
+
+  RdapBootstrapResolver(RdapHttpClient client, Clock clock) {
     this.client = client;
     this.clock = clock;
   }
