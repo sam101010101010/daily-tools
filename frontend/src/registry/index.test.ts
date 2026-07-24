@@ -91,3 +91,30 @@ test('hash checksum tool is a single local registry entry searchable by Chinese 
   expect(searchTools(registry, '文件').map(t => t.id)).toContain('hash');
   await expect(hash[0].load()).resolves.toHaveProperty('default');
 });
+
+test('regexp tester is a unique local registry entry searchable by Chinese and English terms', async () => {
+  const regexp = registry.filter(t => t.id === 'regexp');
+  expect(regexp).toHaveLength(1);
+  expect(new Set(registry.map(t => t.id)).size).toBe(registry.length);
+  expect(regexp[0]).toMatchObject({
+    id: 'regexp',
+    name: '正则表达式测试器',
+    category: '文本',
+    keywords: expect.arrayContaining([
+      'regexp',
+      'regex',
+      'regular expression',
+      '正则',
+      '匹配',
+      '替换',
+    ]),
+  });
+  expect(regexp[0].backend).toBeUndefined();
+  expect(searchTools(registry, 'regexp').map(t => t.id)).toContain('regexp');
+  expect(searchTools(registry, 'regex').map(t => t.id)).toContain('regexp');
+  expect(searchTools(registry, 'regular expression').map(t => t.id)).toContain('regexp');
+  expect(searchTools(registry, '正则').map(t => t.id)).toContain('regexp');
+  expect(searchTools(registry, '匹配').map(t => t.id)).toContain('regexp');
+  expect(searchTools(registry, '替换').map(t => t.id)).toContain('regexp');
+  await expect(regexp[0].load()).resolves.toHaveProperty('default');
+});
