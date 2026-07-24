@@ -41,7 +41,8 @@ class RdapDomainMapperTest {
 
   @Test
   void maps_absent_or_redacted_optional_fields_to_null_or_empty_values() {
-    RdapReport report = mapper.map("example.com", "example.com", URI.create("https://rdap.example/domain/example.com"), "{\"ldhName\":\"example.com\"}");
+    RdapReport report = mapper.map("example.com", "example.com", URI.create("https://rdap.example/domain/example.com"),
+        "{\"objectClassName\":\"domain\",\"ldhName\":\"example.com\"}");
 
     assertThat(report.unicodeName()).isNull();
     assertThat(report.handle()).isNull();
@@ -55,6 +56,12 @@ class RdapDomainMapperTest {
   @Test
   void turns_malformed_rdap_json_into_a_safe_lookup_failure() {
     assertThatThrownBy(() -> mapper.map("example.com", "example.com", URI.create("https://rdap.example/domain/example.com"), "not json"))
+        .isInstanceOfSatisfying(ToolException.class, error -> assertThat(error.getCode()).isEqualTo("RDAP_LOOKUP_FAILED"));
+  }
+
+  @Test
+  void rejects_an_object_that_is_not_an_rdap_domain_response() {
+    assertThatThrownBy(() -> mapper.map("example.com", "example.com", URI.create("https://rdap.example/domain/example.com"), "{}"))
         .isInstanceOfSatisfying(ToolException.class, error -> assertThat(error.getCode()).isEqualTo("RDAP_LOOKUP_FAILED"));
   }
 

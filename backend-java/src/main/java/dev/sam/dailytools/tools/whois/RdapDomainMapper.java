@@ -15,7 +15,9 @@ public class RdapDomainMapper {
   public RdapReport map(String input, String domain, URI source, String rawJson) {
     try {
       JsonNode root = mapper.readTree(rawJson);
-      if (root == null || !root.isObject()) throw failure();
+      if (root == null || !root.isObject() || !"domain".equals(root.path("objectClassName").textValue())) {
+        throw failure();
+      }
       return new RdapReport(
           input, domain, true, source.toString(), text(root, "ldhName"), text(root, "unicodeName"), text(root, "handle"),
           strings(root.path("status")), events(root.path("events")), registrar(root.path("entities")),
