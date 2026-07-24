@@ -15,10 +15,19 @@ import java.time.Duration;
 public class JdkRdapHttpClient implements RdapHttpClient {
   static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
   static final int MAX_BODY_BYTES = 1024 * 1024;
-  private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+  private final HttpClient client;
+
+  public JdkRdapHttpClient() {
+    this(HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build());
+  }
+
+  JdkRdapHttpClient(HttpClient client) {
+    this.client = client;
+  }
 
   @Override
   public RdapHttpResponse get(URI uri) {
+    if (!"https".equalsIgnoreCase(uri.getScheme())) throw failure();
     try {
       HttpRequest request = HttpRequest.newBuilder(uri).timeout(REQUEST_TIMEOUT).GET().build();
       HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());

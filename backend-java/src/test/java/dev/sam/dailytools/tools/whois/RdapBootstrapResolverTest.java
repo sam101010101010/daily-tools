@@ -64,6 +64,21 @@ class RdapBootstrapResolverTest {
     }
   }
 
+  @Test
+  void skips_an_unusable_service_without_rejecting_other_https_authorities() {
+    String bootstrap = """
+        {"services":[
+          [["kg"],["http://rdap.cctld.kg/"]],
+          [["com"],["https://rdap.verisign.com/com/v1/"]]
+        ]}
+        """;
+    RdapBootstrapResolver resolver = new RdapBootstrapResolver(
+        new FakeHttpClient(bootstrap), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+
+    assertThat(resolver.baseUrlFor("example.com"))
+        .isEqualTo(URI.create("https://rdap.verisign.com/com/v1/"));
+  }
+
   private static void assertLookupFailure(String bootstrap, String domain) {
     RdapBootstrapResolver resolver = new RdapBootstrapResolver(
         new FakeHttpClient(bootstrap), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));

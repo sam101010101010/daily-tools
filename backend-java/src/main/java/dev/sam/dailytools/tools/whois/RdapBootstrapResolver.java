@@ -90,8 +90,11 @@ public class RdapBootstrapResolver {
             authorityUrl(url.textValue()).ifPresent(urls::add);
           }
         }
-        if (tlds.isEmpty() || urls.isEmpty()) {
+        if (tlds.isEmpty()) {
           throw lookupFailure();
+        }
+        if (urls.isEmpty()) {
+          continue;
         }
         for (String tld : tlds) {
           for (URI url : urls) {
