@@ -1213,3 +1213,201 @@ main section .regexp__match {
     width: 100%;
   }
 }
+
+/* ---- WHOIS / RDAP registration lookup -------------------------------- */
+
+.whois {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.whois__note,
+.whois__loading,
+.whois__empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.whois__note {
+  padding: 0.7rem 0.8rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.whois__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 0.75rem;
+  align-items: end;
+}
+
+.whois__form label {
+  grid-column: 1 / -1;
+  font-size: 0.85rem;
+}
+
+.whois__form input {
+  width: 100%;
+  min-width: 0;
+}
+
+.whois__form button {
+  margin-left: 0;
+}
+
+.whois__not-found {
+  padding: 0.85rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.whois__not-found p {
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.whois__result {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.whois__section,
+.whois__raw {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.whois__section h3 {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+}
+
+.whois__summary,
+.whois__compact {
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.whois__statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.whois__status-chip {
+  display: inline-flex;
+  padding: 0.15rem 0.5rem;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 0.8rem;
+}
+
+.whois__status-chip--restricted {
+  color: var(--danger);
+  background: var(--danger-weak);
+  border-color: var(--danger);
+}
+
+main section .whois__event-list,
+main section .whois__nameservers,
+main section .whois__notices {
+  gap: 0.5rem;
+}
+
+main section .whois__event-list li {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.75fr) minmax(12rem, 1fr) minmax(8rem, 1fr);
+  gap: 0.4rem 0.8rem;
+  font-family: var(--font);
+}
+
+main section .whois__nameservers li,
+main section .whois__notices li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-family: var(--font);
+}
+
+.whois__event-list span,
+.whois__nameservers span,
+.whois__notices span {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.whois__raw summary {
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.whois__raw summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.whois__raw button {
+  margin: 0.75rem 0 0;
+}
+
+.whois__copy-status {
+  margin-left: 0.65rem;
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+}
+
+.whois__raw pre {
+  max-width: 100%;
+  margin-top: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .whois__form {
+    grid-template-columns: 1fr;
+  }
+
+  .whois__form label {
+    grid-column: auto;
+  }
+
+  .whois__form button {
+    width: 100%;
+  }
+
+  .whois__summary,
+  .whois__compact {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .whois__summary dd,
+  .whois__compact dd {
+    margin-bottom: 0.45rem;
+  }
+
+  main section .whois__event-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .whois__copy-status {
+    display: block;
+    margin: 0.45rem 0 0;
+  }
+}

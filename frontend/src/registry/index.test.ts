@@ -118,3 +118,21 @@ test('regexp tester is a unique local registry entry searchable by Chinese and E
   expect(searchTools(registry, '替换').map(t => t.id)).toContain('regexp');
   await expect(regexp[0].load()).resolves.toHaveProperty('default');
 });
+
+test('WHOIS is one registry-driven RDAP tool searchable by its domain registration terms', async () => {
+  const whois = registry.filter(t => t.id === 'whois');
+  expect(whois).toHaveLength(1);
+  expect(new Set(registry.map(t => t.id)).size).toBe(registry.length);
+  expect(whois[0]).toMatchObject({
+    id: 'whois',
+    category: '网络',
+    backend: '/api/java/whois',
+    keywords: expect.arrayContaining(['whois', 'rdap', 'domain', '域名', '注册商']),
+  });
+  expect(searchTools(registry, 'whois').map(t => t.id)).toEqual(['whois']);
+  expect(searchTools(registry, 'rdap').map(t => t.id)).toEqual(['whois']);
+  expect(searchTools(registry, 'domain').map(t => t.id)).toContain('whois');
+  expect(searchTools(registry, '域名').map(t => t.id)).toEqual(['whois']);
+  expect(searchTools(registry, '注册商').map(t => t.id)).toEqual(['whois']);
+  await expect(whois[0].load()).resolves.toHaveProperty('default');
+});

@@ -1,0 +1,23 @@
+{
+  "objectClassName": "domain",
+  "handle": "2336799_DOMAIN_COM-VRSN",
+  "ldhName": "example.com",
+  "unicodeName": "example.com",
+  "status": ["client delete prohibited", "client transfer prohibited"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "1995-08-14T04:00:00Z"},
+    {"eventAction": "expiration", "eventDate": "2027-08-14T04:00:00Z", "eventActor": "Example Registrar"}
+  ],
+  "entities": [{
+    "handle": "376",
+    "roles": ["registrar"],
+    "vcardArray": ["vcard", [["version", {}, "text", "4.0"], ["fn", {}, "text", "Example Registrar"]]]
+  }],
+  "nameservers": [{
+    "objectClassName": "nameserver",
+    "ldhName": "a.iana-servers.net",
+    "unicodeName": "a.iana-servers.net",
+    "status": ["associated"]
+  }],
+  "notices": [{"title": "Terms of Service", "description": ["First line", "Second line"]}]
+}

@@ -8,6 +8,7 @@ import { timestampMeta } from '../tools/timestamp/meta';
 import { urlMeta } from '../tools/url/meta';
 import { hashMeta } from '../tools/hash/meta';
 import { regexpMeta } from '../tools/regexp/meta';
+import { whoisMeta } from '../tools/whois/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -19,6 +20,7 @@ export const tools: ToolMeta[] = [
   urlMeta,
   hashMeta,
   regexpMeta,
+  whoisMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {
