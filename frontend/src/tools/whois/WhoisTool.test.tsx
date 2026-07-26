@@ -75,6 +75,13 @@ test('pre-fills a public example and only requests the exact RDAP endpoint after
   expect(await screen.findByText('域名摘要')).toBeInTheDocument();
 });
 
+test('shows registered-domain guidance with concrete root and subdomain examples initially', () => {
+  render(<WhoisTool />);
+
+  expect(screen.getByText(/RDAP 查询的是已注册域名的注册信息/)).toBeInTheDocument();
+  expect(screen.getByText(/sam\.pub/)).toHaveTextContent('sam.pub，而不是子域名 tools.sam.pub');
+});
+
 test('renders a readable found report, keeps raw JSON closed, and copies its exact source text', async () => {
   mockedCallTool.mockResolvedValue(foundReport());
   mockedCopyText.mockResolvedValue({ ok: true });

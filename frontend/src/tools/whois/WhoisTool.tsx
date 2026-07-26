@@ -77,7 +77,7 @@ export default function WhoisTool() {
   return (
     <div className="whois">
       <p className="whois__note">
-        仅在点击查询后，通过公开 RDAP 服务获取域名注册信息；结果可能因注册局隐私策略而省略。
+        仅在点击查询后，通过公开 RDAP 服务获取域名注册信息；RDAP 查询的是已注册域名的注册信息，例如查询 sam.pub，而不是子域名 tools.sam.pub；结果可能因注册局隐私策略而省略。
       </p>
       <div className="whois__form">
         <label htmlFor="whois-domain">域名</label>
