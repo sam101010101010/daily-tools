@@ -24,7 +24,7 @@ class RdapBootstrapResolverTest {
 
     assertThat(resolver.baseUrlFor("example.com"))
         .isEqualTo(URI.create("https://rdap.com.example/rdap/"));
-    assertThat(resolver.baseUrlFor("www.example.co.uk"))
+    assertThat(resolver.baseUrlFor("example.co.uk"))
         .isEqualTo(URI.create("https://rdap.couk.example/rdap/"));
     assertThat(client.requests).containsExactly(RdapBootstrapResolver.IANA_DNS_BOOTSTRAP);
   }
@@ -36,7 +36,7 @@ class RdapBootstrapResolverTest {
     RdapBootstrapResolver resolver = new RdapBootstrapResolver(client, clock);
 
     resolver.baseUrlFor("example.com");
-    resolver.baseUrlFor("www.example.co.uk");
+    resolver.baseUrlFor("example.co.uk");
     assertThat(client.requests).hasSize(1);
 
     clock.advance(Duration.ofHours(24));

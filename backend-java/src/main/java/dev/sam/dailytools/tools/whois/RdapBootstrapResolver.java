@@ -21,6 +21,7 @@ public class RdapBootstrapResolver {
   public static final URI IANA_DNS_BOOTSTRAP = URI.create("https://data.iana.org/rdap/dns.json");
   private static final Duration CACHE_TTL = Duration.ofHours(24);
   private static final String LOOKUP_FAILURE = "RDAP 服务发现失败，请稍后重试";
+  private static final String REGISTRABLE_DOMAIN_REQUIRED = "RDAP 查询的是已注册域名，请勿输入子域名";
 
   private final RdapHttpClient client;
   private final Clock clock;
@@ -40,11 +41,18 @@ public class RdapBootstrapResolver {
 
   public URI baseUrlFor(String normalizedDomain) {
     String domain = normalizedDomain.toLowerCase(Locale.ROOT);
-    return services().stream()
-        .filter(service -> domain.equals(service.tld()) || domain.endsWith("." + service.tld()))
-        .max(Comparator.comparingInt(service -> service.tld().length()))
-        .map(Service::baseUrl)
+    Service service = services().stream()
+        .filter(candidate -> domain.equals(candidate.tld()) || domain.endsWith("." + candidate.tld()))
+        .max(Comparator.comparingInt(candidate -> candidate.tld().length()))
         .orElseThrow(RdapBootstrapResolver::lookupFailure);
+    if (domain.equals(service.tld())) {
+      throw registrableDomainRequired();
+    }
+    String leftOfSuffix = domain.substring(0, domain.length() - service.tld().length() - 1);
+    if (leftOfSuffix.isEmpty() || leftOfSuffix.contains(".")) {
+      throw registrableDomainRequired();
+    }
+    return service.baseUrl();
   }
 
   private synchronized List<Service> services() {
@@ -141,6 +149,10 @@ public class RdapBootstrapResolver {
 
   private static ToolException lookupFailure() {
     return new ToolException("RDAP_LOOKUP_FAILED", LOOKUP_FAILURE);
+  }
+
+  private static ToolException registrableDomainRequired() {
+    return new ToolException("VALIDATION_ERROR", REGISTRABLE_DOMAIN_REQUIRED);
   }
 
   private record Service(String tld, URI baseUrl) {}
