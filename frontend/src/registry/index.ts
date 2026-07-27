@@ -9,6 +9,7 @@ import { urlMeta } from '../tools/url/meta';
 import { hashMeta } from '../tools/hash/meta';
 import { regexpMeta } from '../tools/regexp/meta';
 import { whoisMeta } from '../tools/whois/meta';
+import { ipCidrMeta } from '../tools/ip-cidr/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -21,6 +22,7 @@ export const tools: ToolMeta[] = [
   hashMeta,
   regexpMeta,
   whoisMeta,
+  ipCidrMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {
