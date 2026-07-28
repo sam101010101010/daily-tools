@@ -108,34 +108,38 @@ export default function IdGeneratorTool() {
         <p>UUID v4 是随机标识符；UUID v7 按时间排序并编码生成时间；ULID 是可按字典序排序的紧凑标识符。</p>
 
         <div className="id-generator__controls">
-          <label htmlFor="id-generator-kind">标识符类型</label>
-          <select
-            id="id-generator-kind"
-            value={kind}
-            onChange={(event) => {
-              setKind(event.target.value as IdKindValue);
-              resetCopyState();
-            }}
-          >
-            <option value={IdKind.UUID_V4}>UUID v4</option>
-            <option value={IdKind.UUID_V7}>UUID v7</option>
-            <option value={IdKind.ULID}>ULID</option>
-          </select>
+          <div className="id-generator__field">
+            <label htmlFor="id-generator-kind">标识符类型</label>
+            <select
+              id="id-generator-kind"
+              value={kind}
+              onChange={(event) => {
+                setKind(event.target.value as IdKindValue);
+                resetCopyState();
+              }}
+            >
+              <option value={IdKind.UUID_V4}>UUID v4</option>
+              <option value={IdKind.UUID_V7}>UUID v7</option>
+              <option value={IdKind.ULID}>ULID</option>
+            </select>
+          </div>
 
-          <label htmlFor="id-generator-count">生成数量</label>
-          <input
-            id="id-generator-count"
-            type="number"
-            min="1"
-            max="100"
-            step="1"
-            value={count}
-            onChange={(event) => {
-              setCount(event.target.value);
-              setGenerationError('');
-              resetCopyState();
-            }}
-          />
+          <div className="id-generator__field id-generator__field--count">
+            <label htmlFor="id-generator-count">生成数量</label>
+            <input
+              id="id-generator-count"
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              value={count}
+              onChange={(event) => {
+                setCount(event.target.value);
+                setGenerationError('');
+                resetCopyState();
+              }}
+            />
+          </div>
 
           <button type="button" onClick={generate}>生成标识符</button>
         </div>
@@ -146,18 +150,24 @@ export default function IdGeneratorTool() {
           <div className="id-generator__output">
             <div className="id-generator__output-heading">
               <h3>生成结果</h3>
-              <button type="button" onClick={() => void copyAll()}>全部复制</button>
+              <button
+                className="id-generator__copy-all"
+                type="button"
+                onClick={() => void copyAll()}
+              >
+                全部复制
+              </button>
             </div>
             <ol
               className="id-generator__results id-generator__results--scrollable"
               aria-label="生成结果"
-              style={{ maxHeight: '24rem', overflowY: 'auto' }}
               tabIndex={0}
             >
               {ids.map((id, index) => (
                 <li key={id}>
                   <code>{id}</code>
                   <button
+                    className="id-generator__copy-one"
                     type="button"
                     aria-label={`复制第 ${index + 1} 个标识符`}
                     onClick={() => void copyOne(id, index)}

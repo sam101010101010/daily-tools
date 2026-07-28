@@ -62,8 +62,10 @@ test('generates a scrollable batch of 100 and replaces the previous results', as
   const firstBatch = generatedValues();
   expect(firstBatch).toHaveLength(100);
   expect(results).toHaveClass('id-generator__results--scrollable');
-  expect(results).toHaveStyle({ maxHeight: '24rem', overflowY: 'auto' });
+  expect(results).not.toHaveAttribute('style');
   expect(results).toHaveAttribute('tabindex', '0');
+  expect(screen.getByRole('button', { name: '全部复制' })).toHaveClass('id-generator__copy-all');
+  expect(screen.getByRole('button', { name: '复制第 1 个标识符' })).toHaveClass('id-generator__copy-one');
   expect(screen.queryAllByRole('status')).toHaveLength(0);
 
   await user.click(screen.getByRole('button', { name: '生成标识符' }));

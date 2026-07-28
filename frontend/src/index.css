@@ -1411,3 +1411,220 @@ main section .whois__notices li {
     margin: 0.45rem 0 0;
   }
 }
+
+/* ---- UUID / ULID generator --------------------------------------------- */
+
+.id-generator {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.id-generator__card {
+  min-width: 0;
+}
+
+.id-generator__card + .id-generator__card {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.id-generator__card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.id-generator__card > p {
+  margin: 0.45rem 0 0;
+}
+
+.id-generator__controls {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) 7rem auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 1rem;
+}
+
+.id-generator__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.id-generator__field label,
+.id-generator__card > label {
+  display: block;
+  width: auto;
+  font-size: 0.82rem;
+}
+
+.id-generator__field select,
+.id-generator__field input,
+.id-generator__card > input {
+  width: 100%;
+  min-width: 0;
+}
+
+.id-generator__field input[type="number"] {
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.id-generator__field input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+
+.id-generator__controls > button {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.id-generator__output {
+  min-width: 0;
+  margin-top: 1.25rem;
+}
+
+.id-generator__output-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.id-generator__output-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.id-generator__copy-all {
+  margin: 0 0 0 auto;
+}
+
+.id-generator__copy-all,
+.id-generator__copy-one {
+  min-height: 2.5rem;
+  padding: 0.35rem 0.75rem;
+  color: var(--accent-strong);
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.id-generator__copy-all:hover:not(:disabled),
+.id-generator__copy-one:hover:not(:disabled) {
+  color: var(--on-accent);
+}
+
+.id-generator__results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.id-generator__results--scrollable {
+  max-height: 24rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.id-generator__results--scrollable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+main section .id-generator__results li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  font-family: var(--mono);
+}
+
+.id-generator__results code {
+  min-width: 0;
+  font-family: inherit;
+  overflow-wrap: anywhere;
+}
+
+.id-generator__copy-one {
+  margin: 0;
+  font-family: var(--font);
+}
+
+.id-generator > [role="status"] {
+  margin: -0.85rem 0 0;
+  padding-left: 0.65rem;
+  color: var(--accent-strong);
+  border-left: 3px solid var(--accent);
+}
+
+.id-generator__card > [role="alert"] {
+  padding: 0.55rem 0.7rem;
+  color: var(--danger);
+  background: var(--danger-weak);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+
+.id-generator__card > label {
+  margin-top: 1rem;
+}
+
+.id-generator__card > input {
+  margin-top: 0.3rem;
+}
+
+.id-generator__inspection {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.id-generator__inspection code {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 390px) {
+  .id-generator__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .id-generator__field--count {
+    width: 100%;
+  }
+
+  .id-generator__controls > button,
+  .id-generator__copy-all {
+    width: 100%;
+  }
+
+  .id-generator__output-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .id-generator__copy-all {
+    margin-left: 0;
+  }
+
+  .id-generator__inspection {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .id-generator__inspection dd {
+    margin-bottom: 0.45rem;
+  }
+}
