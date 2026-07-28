@@ -11,9 +11,19 @@ export type CronMemberNode = CronBaseNode | Readonly<{ kind: 'step'; base: CronB
 
 export type CronNode = CronMemberNode | Readonly<{ kind: 'list'; items: readonly CronMemberNode[] }>;
 
+type CronField<Name extends CronFieldName> = Readonly<{ name: Name; node: CronNode }>;
+
+export type FiveFieldCronFields = readonly [
+  CronField<'minute'>,
+  CronField<'hour'>,
+  CronField<'dayOfMonth'>,
+  CronField<'month'>,
+  CronField<'dayOfWeek'>,
+];
+
 export type FiveFieldCron = Readonly<{
   normalized: string;
-  fields: readonly Readonly<{ name: CronFieldName; node: CronNode }>[];
+  fields: FiveFieldCronFields;
 }>;
 
 export type CronSyntaxError = Readonly<{
@@ -47,13 +57,8 @@ function failure(field: CronSyntaxError['field'], code: CronSyntaxError['code'],
   return { ok: false, error: { field, code, message } };
 }
 
-function normalizeToken(token: string, definition: FieldDefinition): string | undefined {
-  const uppercase = token.toUpperCase();
-  if (!definition.names) return uppercase;
-  return uppercase.replace(/[A-Z]+/g, (name) => String(definition.names?.[name] ?? Number.NaN));
-}
-
 function readValue(token: string, definition: FieldDefinition): number | undefined {
+  if (definition.names && Object.hasOwn(definition.names, token.toUpperCase())) return definition.names[token.toUpperCase()];
   if (!/^\d+$/.test(token)) return undefined;
   const value = Number(token);
   return value >= definition.minimum && value <= definition.maximum ? value : undefined;
@@ -61,7 +66,7 @@ function readValue(token: string, definition: FieldDefinition): number | undefin
 
 function parseBase(token: string, definition: FieldDefinition): CronBaseNode | ParseFiveFieldCronResult {
   if (token === '*') return { kind: 'wildcard' };
-  const range = /^(\d+)-(\d+)$/.exec(token);
+  const range = /^([A-Za-z\d]+)-([A-Za-z\d]+)$/.exec(token);
   if (range) {
     const start = readValue(range[1], definition);
     const end = readValue(range[2], definition);
@@ -81,7 +86,7 @@ function isFailure(value: unknown): value is ParseFiveFieldCronResult {
 
 function parseMember(member: string, definition: FieldDefinition): CronMemberNode | ParseFiveFieldCronResult {
   if (member.length === 0) return failure(definition.name, 'empty-member', '列表中不能有空项');
-  if (!/^[\d*/-]+$/.test(member)) return failure(definition.name, 'unsupported', '字段包含不支持的语法');
+  if (!/^[A-Za-z\d*/-]+$/.test(member)) return failure(definition.name, 'unsupported', '字段包含不支持的语法');
 
   const stepParts = member.split('/');
   if (stepParts.length > 2) return failure(definition.name, 'unsupported', '字段包含不支持的语法');
@@ -98,9 +103,7 @@ function parseMember(member: string, definition: FieldDefinition): CronMemberNod
 }
 
 function parseField(rawField: string, definition: FieldDefinition): CronNode | ParseFiveFieldCronResult {
-  const normalizedField = normalizeToken(rawField, definition);
-  if (!normalizedField || normalizedField.includes('NaN')) return failure(definition.name, 'unsupported', '字段包含不支持的名称');
-  const members = normalizedField.split(',');
+  const members = rawField.split(',');
   const nodes: CronMemberNode[] = [];
   for (const member of members) {
     const node = parseMember(member, definition);
@@ -115,12 +118,12 @@ export function parseFiveFieldCron(input: string): ParseFiveFieldCronResult {
   const rawFields = normalized === '' ? [] : normalized.split(' ');
   if (rawFields.length !== 5) return failure('expression', 'field-count', 'Cron 表达式必须恰好包含五个字段');
 
-  const fields: FiveFieldCron['fields'][number][] = [];
+  const fields: CronNode[] = [];
   for (let index = 0; index < FIELDS.length; index += 1) {
     const definition = FIELDS[index];
     const node = parseField(rawFields[index], definition);
     if (isFailure(node)) return node;
-    fields.push({ name: definition.name, node });
+    fields.push(node);
   }
 
   try {
@@ -129,5 +132,17 @@ export function parseFiveFieldCron(input: string): ParseFiveFieldCronResult {
     return failure('expression', 'semantic', 'Cron 表达式的字段组合无效');
   }
 
-  return { ok: true, value: { normalized: normalized.toUpperCase(), fields } };
+  return {
+    ok: true,
+    value: {
+      normalized: normalized.toUpperCase(),
+      fields: [
+        { name: 'minute', node: fields[0] },
+        { name: 'hour', node: fields[1] },
+        { name: 'dayOfMonth', node: fields[2] },
+        { name: 'month', node: fields[3] },
+        { name: 'dayOfWeek', node: fields[4] },
+      ],
+    },
+  };
 }
