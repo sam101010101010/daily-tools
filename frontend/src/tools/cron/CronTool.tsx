@@ -55,16 +55,20 @@ function supportedTimeZones(defaultTimeZone: string): string[] {
   return [...new Set([defaultTimeZone, 'UTC', ...zones])].sort();
 }
 
-function unsupportedFeature(input: string): string | undefined {
+function unsupportedFeature(input: string, field: CronSyntaxError['field']): string | undefined {
   const trimmed = input.trim();
   const normalized = trimmed.toUpperCase();
   if (normalized.startsWith('@')) return `${trimmed.split(/\s/, 1)[0]} 昵称`;
   if (/^\d{4}-\d{2}-\d{2}T/.test(normalized)) return 'ISO 时间';
-  return ['#', '?', '+', 'L', 'W'].find(feature => normalized.includes(feature));
+  const symbol = ['#', '?', '+'].find(feature => normalized.includes(feature));
+  if (symbol) return symbol;
+  if ((field === 'dayOfMonth' || field === 'dayOfWeek') && normalized.includes('L')) return 'L';
+  if (field === 'dayOfMonth' && normalized.includes('W')) return 'W';
+  return undefined;
 }
 
 function syntaxErrorMessage(error: CronSyntaxError, input: string): string {
-  const feature = unsupportedFeature(input);
+  const feature = unsupportedFeature(input, error.field);
   if (error.code === 'field-count') {
     if (feature) return `不支持 ${feature}。`;
     return '只支持五字段，不支持秒或年份字段。';

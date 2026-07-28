@@ -100,6 +100,20 @@ test.each([
   expect(screen.queryByLabelText('未来 10 次运行时间')).not.toBeInTheDocument();
 });
 
+test.each([
+  ['0 0 * JULX *', '月份字段：字段值无效'],
+  ['0 0 * * WEDX', '星期字段：字段值无效'],
+])('does not mislabel malformed aliases as L/W extensions for %s', async (expression, message) => {
+  const user = userEvent.setup();
+  render(<CronTool now={() => FIXED_NOW} />);
+
+  await user.clear(screen.getByLabelText('Cron 表达式'));
+  await user.type(screen.getByLabelText('Cron 表达式'), expression);
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('alert')).toHaveTextContent(message);
+});
+
 test('maps dependency failures to a stable error without leaking raw stack text or stale preview', async () => {
   const user = userEvent.setup();
   render(<CronTool now={() => FIXED_NOW} />);
