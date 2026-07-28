@@ -1565,7 +1565,7 @@ main section .id-generator__results li {
   font-family: var(--font);
 }
 
-.id-generator > [role="status"] {
+.id-generator__card > [role="status"] {
   margin: -0.85rem 0 0;
   padding-left: 0.65rem;
   color: var(--accent-strong);

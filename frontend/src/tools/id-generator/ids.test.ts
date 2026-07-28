@@ -2,11 +2,11 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { decodeUuidV7Timestamp, generateIds, inspectId } from './ids';
 
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 test('generates canonical lowercase UUID v4 values with RFC version and variant bits', () => {
@@ -15,16 +15,28 @@ test('generates canonical lowercase UUID v4 values with RFC version and variant 
   expect(id).toMatch(UUID_V4_PATTERN);
 });
 
-test('generates UUID v7 values in timestamp order', () => {
+test('generates a strictly ordered UUID v7 batch within one frozen millisecond', () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2027-01-01T00:00:00.000Z'));
-  const [first] = generateIds({ kind: 'uuid-v7' });
-  vi.advanceTimersByTime(1);
-  const [second] = generateIds({ kind: 'uuid-v7' });
+  vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation((array) => {
+    const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+    bytes.fill(0x11);
+    return array;
+  });
+  const ids = generateIds({ kind: 'uuid-v7', count: 5 });
 
-  expect(first).toMatch(UUID_V7_PATTERN);
-  expect(second).toMatch(UUID_V7_PATTERN);
-  expect([first, second]).toEqual([first, second].toSorted());
+  expect(ids).toEqual([
+    '01a2ce8b-d400-7089-8444-451111111111',
+    '01a2ce8b-d400-7089-8444-491111111111',
+    '01a2ce8b-d400-7089-8444-4d1111111111',
+    '01a2ce8b-d400-7089-8444-511111111111',
+    '01a2ce8b-d400-7089-8444-551111111111',
+  ]);
+  expect(ids.map(decodeUuidV7Timestamp)).toEqual(
+    Array.from({ length: 5 }, () => Date.parse('2027-01-01T00:00:00.000Z')),
+  );
+  expect(ids).toEqual(ids.toSorted());
+  expect(new Set(ids)).toHaveLength(ids.length);
 });
 
 test('generates uppercase monotonic ULIDs in lexical order within one millisecond', () => {
