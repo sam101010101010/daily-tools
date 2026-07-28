@@ -79,15 +79,20 @@ test('keeps DST gap behavior visible in target-zone and ISO columns', async () =
   const rows = within(screen.getByLabelText('未来 10 次运行时间')).getAllByRole('row');
   expect(rows[1]).toHaveTextContent('2024-03-09 02:30:00 America/New_York');
   expect(rows[1]).toHaveTextContent('2024-03-09T07:30:00.000Z');
-  expect(rows[2]).toHaveTextContent('2024-03-10 03:30:00 America/New_York');
-  expect(rows[2]).toHaveTextContent('2024-03-10T07:30:00.000Z');
+  expect(rows[2]).toHaveTextContent('2024-03-11 02:30:00 America/New_York');
+  expect(rows[2]).toHaveTextContent('2024-03-11T06:30:00.000Z');
 });
 
 test.each([
   ['0 0 L * *', '日期字段不支持 L 扩展语法'],
+  ['0 0 1W * *', '日期字段不支持 W 扩展语法'],
   ['0 0 * * MON#2', '星期字段不支持 # 扩展语法'],
+  ['0 0 ? * *', '日期字段不支持 ? 扩展语法'],
+  ['0 0 * * +MON', '星期字段不支持 + 扩展语法'],
   ['0 0 1 1 * *', '只支持五字段，不支持秒或年份字段'],
+  ['0 0 0 1 1 * 2026', '只支持五字段，不支持秒或年份字段'],
   ['@daily', '不支持 @daily 昵称'],
+  ['2026-01-01T00:00:00Z', '不支持 ISO 时间'],
 ])('reports the unsupported field or feature for %s', async (expression, message) => {
   const user = userEvent.setup();
   render(<CronTool now={() => FIXED_NOW} />);
@@ -103,7 +108,8 @@ test.each([
 test.each([
   ['0 0 * JULX *', '月份字段：字段值无效'],
   ['0 0 * * WEDX', '星期字段：字段值无效'],
-])('does not mislabel malformed aliases as L/W extensions for %s', async (expression, message) => {
+  ['BAD * * * MON#2', '分钟字段：字段值无效'],
+])('does not attribute an extension from another field to %s', async (expression, message) => {
   const user = userEvent.setup();
   render(<CronTool now={() => FIXED_NOW} />);
 
@@ -112,6 +118,7 @@ test.each([
   await user.keyboard('{Enter}');
 
   expect(screen.getByRole('alert')).toHaveTextContent(message);
+  expect(screen.getByRole('alert')).not.toHaveTextContent('不支持 #');
 });
 
 test('maps dependency failures to a stable error without leaking raw stack text or stale preview', async () => {

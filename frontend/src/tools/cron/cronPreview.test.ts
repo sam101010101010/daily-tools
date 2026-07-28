@@ -66,13 +66,13 @@ test('uses OR semantics when day-of-month and day-of-week are both restricted', 
   ]);
 });
 
-test('keeps Croner DST gap and overlap behavior visible in America/New_York', () => {
+test('skips DST gap occurrences and lists an overlap only once in America/New_York', () => {
   const spring = preview('30 2 * * *', 'America/New_York', '2024-03-09T00:00:00.000Z');
   isPreview(spring);
   expect(spring.value.runs.slice(0, 3)).toEqual([
     { iso: '2024-03-09T07:30:00.000Z', local: '2024-03-09 02:30:00 America/New_York' },
-    { iso: '2024-03-10T07:30:00.000Z', local: '2024-03-10 03:30:00 America/New_York' },
     { iso: '2024-03-11T06:30:00.000Z', local: '2024-03-11 02:30:00 America/New_York' },
+    { iso: '2024-03-12T06:30:00.000Z', local: '2024-03-12 02:30:00 America/New_York' },
   ]);
 
   const autumn = preview('30 1 * * *', 'America/New_York', '2024-11-02T00:00:00.000Z');

@@ -26,6 +26,14 @@ const FIELD_LABELS: Record<CronSyntaxError['field'], string> = {
   dayOfWeek: '星期',
 };
 
+const FIELD_INDEX: Partial<Record<CronSyntaxError['field'], number>> = {
+  minute: 0,
+  hour: 1,
+  dayOfMonth: 2,
+  month: 3,
+  dayOfWeek: 4,
+};
+
 type SuccessView = Readonly<{
   kind: 'success';
   normalized: string;
@@ -60,10 +68,12 @@ function unsupportedFeature(input: string, field: CronSyntaxError['field']): str
   const normalized = trimmed.toUpperCase();
   if (normalized.startsWith('@')) return `${trimmed.split(/\s/, 1)[0]} 昵称`;
   if (/^\d{4}-\d{2}-\d{2}T/.test(normalized)) return 'ISO 时间';
-  const symbol = ['#', '?', '+'].find(feature => normalized.includes(feature));
+  const fieldIndex = FIELD_INDEX[field];
+  const fieldToken = fieldIndex === undefined ? '' : (trimmed.split(/\s+/)[fieldIndex] ?? '').toUpperCase();
+  const symbol = ['#', '?', '+'].find(feature => fieldToken.includes(feature));
   if (symbol) return symbol;
-  if ((field === 'dayOfMonth' || field === 'dayOfWeek') && normalized.includes('L')) return 'L';
-  if (field === 'dayOfMonth' && normalized.includes('W')) return 'W';
+  if ((field === 'dayOfMonth' || field === 'dayOfWeek') && fieldToken.includes('L')) return 'L';
+  if (field === 'dayOfMonth' && fieldToken.includes('W')) return 'W';
   return undefined;
 }
 

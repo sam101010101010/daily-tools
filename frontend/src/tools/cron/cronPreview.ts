@@ -35,8 +35,20 @@ function formatInTimeZone(date: Date, timeZone: string): string {
 export function previewCron(cron: FiveFieldCron, timeZone: string, now: Date): CronPreviewResult {
   if (!isValidIanaTimeZone(timeZone)) return { ok: false, error: '不是有效的 IANA 时区' };
 
-  const runs = new Cron(cron.normalized, { timezone: timeZone, paused: true, domAndDow: false })
-    .nextRuns(10, now)
-    .map((date) => ({ iso: date.toISOString(), local: formatInTimeZone(date, timeZone) }));
+  const evaluator = new Cron(cron.normalized, {
+    timezone: timeZone,
+    paused: true,
+    domAndDow: false,
+    mode: '5-part',
+  });
+  const dates: Date[] = [];
+  let cursor = now;
+  while (dates.length < 10) {
+    const candidates = evaluator.nextRuns(10 - dates.length, cursor);
+    if (candidates.length === 0) break;
+    cursor = candidates[candidates.length - 1];
+    dates.push(...candidates.filter(candidate => evaluator.match(candidate)));
+  }
+  const runs = dates.map((date) => ({ iso: date.toISOString(), local: formatInTimeZone(date, timeZone) }));
   return { ok: true, value: { timeZone, runs } };
 }
