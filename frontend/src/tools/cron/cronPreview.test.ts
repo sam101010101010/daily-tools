@@ -84,6 +84,17 @@ test('skips DST gap occurrences and lists an overlap only once in America/New_Yo
   ]);
 });
 
+test('deduplicates a shifted DST gap when the shifted wall time also matches', () => {
+  const result = preview('30 2-3 * * *', 'America/New_York', '2024-03-09T00:00:00.000Z');
+  isPreview(result);
+
+  expect(result.value.runs).toHaveLength(10);
+  expect(new Set(result.value.runs.map(run => run.iso)).size).toBe(10);
+  expect(result.value.runs.filter(run => run.local === '2024-03-10 03:30:00 America/New_York')).toEqual([
+    { iso: '2024-03-10T07:30:00.000Z', local: '2024-03-10 03:30:00 America/New_York' },
+  ]);
+});
+
 test('rejects an invalid IANA timezone before previewing', () => {
   expect(preview('0 0 * * *', 'Mars/Olympus', '2024-01-01T00:00:00.000Z')).toEqual({
     ok: false,

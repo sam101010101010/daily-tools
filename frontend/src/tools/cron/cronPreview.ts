@@ -42,12 +42,19 @@ export function previewCron(cron: FiveFieldCron, timeZone: string, now: Date): C
     mode: '5-part',
   });
   const dates: Date[] = [];
+  const seenInstants = new Set<number>();
   let cursor = now;
   while (dates.length < 10) {
     const candidates = evaluator.nextRuns(10 - dates.length, cursor);
     if (candidates.length === 0) break;
     cursor = candidates[candidates.length - 1];
-    dates.push(...candidates.filter(candidate => evaluator.match(candidate)));
+    for (const candidate of candidates) {
+      const instant = candidate.getTime();
+      if (!seenInstants.has(instant) && evaluator.match(candidate)) {
+        seenInstants.add(instant);
+        dates.push(candidate);
+      }
+    }
   }
   const runs = dates.map((date) => ({ iso: date.toISOString(), local: formatInTimeZone(date, timeZone) }));
   return { ok: true, value: { timeZone, runs } };
