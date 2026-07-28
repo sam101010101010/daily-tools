@@ -10,6 +10,7 @@ import { hashMeta } from '../tools/hash/meta';
 import { regexpMeta } from '../tools/regexp/meta';
 import { whoisMeta } from '../tools/whois/meta';
 import { idGeneratorMeta } from '../tools/id-generator/meta';
+import { ipCidrMeta } from '../tools/ip-cidr/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -23,6 +24,7 @@ export const tools: ToolMeta[] = [
   regexpMeta,
   whoisMeta,
   idGeneratorMeta,
+  ipCidrMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {

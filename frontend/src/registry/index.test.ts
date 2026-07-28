@@ -156,3 +156,40 @@ test('ID generator is one local registry tool searchable by UUID, GUID, and ULID
   expect(searchTools(registry, '时间有序').map(t => t.id)).toEqual(['id-generator']);
   await expect(idGenerator[0].load()).resolves.toHaveProperty('default');
 });
+
+test('IP CIDR calculator is one local registry tool searchable by subnet terms', async () => {
+  const ipCidr = registry.filter(t => t.id === 'ip-cidr');
+  expect(ipCidr).toHaveLength(1);
+  expect(new Set(registry.map(t => t.id)).size).toBe(registry.length);
+  expect(ipCidr[0]).toMatchObject({
+    id: 'ip-cidr',
+    name: 'IP / CIDR 计算器',
+    category: '网络',
+    keywords: expect.arrayContaining([
+      'IP',
+      'subnet',
+      'CIDR',
+      '掩码',
+      'IPv4',
+      'IPv6',
+    ]),
+  });
+  expect(ipCidr[0].backend).toBeUndefined();
+  expect(searchTools(registry, 'IP').map(t => t.id)).toContain('ip-cidr');
+  expect(searchTools(registry, 'subnet').map(t => t.id)).toContain(
+    'ip-cidr',
+  );
+  expect(searchTools(registry, 'CIDR').map(t => t.id)).toContain(
+    'ip-cidr',
+  );
+  expect(searchTools(registry, '掩码').map(t => t.id)).toContain(
+    'ip-cidr',
+  );
+  expect(searchTools(registry, 'IPv4').map(t => t.id)).toContain(
+    'ip-cidr',
+  );
+  expect(searchTools(registry, 'IPv6').map(t => t.id)).toContain(
+    'ip-cidr',
+  );
+  await expect(ipCidr[0].load()).resolves.toHaveProperty('default');
+});
