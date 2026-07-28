@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { copyText } from '../../lib/copy';
 import {
   generateIds,
@@ -55,36 +55,50 @@ export default function IdGeneratorTool() {
   const [count, setCount] = useState('1');
   const [ids, setIds] = useState<readonly string[]>([]);
   const [generationError, setGenerationError] = useState('');
-  const [copyStatus, setCopyStatus] = useState('');
+  const [copyStatus, setCopyStatus] = useState<{ id: number; message: string }>();
   const [inspectionInput, setInspectionInput] = useState('');
+  const copyVersion = useRef(0);
 
   const normalizedInspectionInput = inspectionInput.trim();
   const inspection = normalizedInspectionInput === ''
     ? undefined
     : inspectId(normalizedInspectionInput);
 
+  function resetCopyState() {
+    copyVersion.current += 1;
+    setCopyStatus(undefined);
+  }
+
   function generate() {
+    resetCopyState();
     const parsedCount = Number(count);
 
     try {
       setIds(generateIds({ kind, count: parsedCount }));
       setGenerationError('');
-      setCopyStatus('');
     } catch {
       setIds([]);
       setGenerationError('生成数量必须是 1 到 100 之间的整数');
-      setCopyStatus('');
     }
   }
 
-  async function copyOne(id: string, index: number) {
-    const result = await copyText(id);
-    setCopyStatus(result.ok ? `第 ${index + 1} 个标识符已复制` : result.message);
+  async function copy(value: string, successMessage: string) {
+    const version = ++copyVersion.current;
+    const result = await copyText(value);
+    if (copyVersion.current !== version) return;
+
+    setCopyStatus({
+      id: version,
+      message: result.ok ? successMessage : result.message,
+    });
   }
 
-  async function copyAll() {
-    const result = await copyText(ids.join('\n'));
-    setCopyStatus(result.ok ? '全部标识符已复制' : result.message);
+  function copyOne(id: string, index: number) {
+    return copy(id, `第 ${index + 1} 个标识符已复制`);
+  }
+
+  function copyAll() {
+    return copy(ids.join('\n'), '全部标识符已复制');
   }
 
   return (
@@ -100,7 +114,7 @@ export default function IdGeneratorTool() {
             value={kind}
             onChange={(event) => {
               setKind(event.target.value as IdKindValue);
-              setCopyStatus('');
+              resetCopyState();
             }}
           >
             <option value={IdKind.UUID_V4}>UUID v4</option>
@@ -118,7 +132,8 @@ export default function IdGeneratorTool() {
             value={count}
             onChange={(event) => {
               setCount(event.target.value);
-              setCopyStatus('');
+              setGenerationError('');
+              resetCopyState();
             }}
           />
 
@@ -155,7 +170,9 @@ export default function IdGeneratorTool() {
           </div>
         )}
 
-        {copyStatus && <p role="status" aria-live="polite">{copyStatus}</p>}
+        {copyStatus && (
+          <p key={copyStatus.id} role="status" aria-live="polite">{copyStatus.message}</p>
+        )}
       </section>
 
       <section className="id-generator__card" aria-labelledby="id-generator-inspection-heading">

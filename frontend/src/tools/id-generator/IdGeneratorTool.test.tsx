@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import IdGeneratorTool from './IdGeneratorTool';
@@ -18,6 +18,14 @@ function generatedValues(): string[] {
     if (value === null) throw new Error('generated identifier has no text');
     return value;
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
 }
 
 test('defaults to one UUID v4 and generates the selected UUID v7 or ULID type', async () => {
@@ -64,6 +72,21 @@ test('generates a scrollable batch of 100 and replaces the previous results', as
   expect(secondBatch).not.toEqual(firstBatch);
 });
 
+test('clears a submitted count error as soon as the count is edited', async () => {
+  const user = userEvent.setup();
+  render(<IdGeneratorTool />);
+  const count = screen.getByRole('spinbutton', { name: '生成数量' });
+
+  await user.clear(count);
+  await user.type(count, '0');
+  await user.click(screen.getByRole('button', { name: '生成标识符' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('生成数量必须是 1 到 100 之间的整数');
+
+  await user.clear(count);
+  await user.type(count, '2');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
 test('supports keyboard generation and exposes results with list semantics', async () => {
   const user = userEvent.setup();
   render(<IdGeneratorTool />);
@@ -100,6 +123,81 @@ test('copies an individual identifier and the whole newline-delimited list with 
   expect(writeText).toHaveBeenLastCalledWith(values.join('\n'));
   expect(screen.getAllByRole('status')).toHaveLength(1);
   expect(screen.getByRole('status')).toHaveTextContent('全部标识符已复制');
+});
+
+test('repeats the same copy announcement through a fresh live-region update', async () => {
+  const user = userEvent.setup();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+  render(<IdGeneratorTool />);
+
+  await user.click(screen.getByRole('button', { name: '生成标识符' }));
+  const copy = screen.getByRole('button', { name: '复制第 1 个标识符' });
+  await user.click(copy);
+  const firstAnnouncement = screen.getByRole('status');
+
+  await user.click(copy);
+
+  expect(writeText).toHaveBeenCalledTimes(2);
+  expect(screen.getAllByRole('status')).toHaveLength(1);
+  expect(screen.getByRole('status')).toHaveTextContent('第 1 个标识符已复制');
+  expect(screen.getByRole('status')).not.toBe(firstAnnouncement);
+});
+
+test('keeps the newest copy feedback when clipboard completions resolve out of order', async () => {
+  const user = userEvent.setup();
+  const firstCopy = deferred<void>();
+  const secondCopy = deferred<void>();
+  const writeText = vi.fn()
+    .mockReturnValueOnce(firstCopy.promise)
+    .mockReturnValueOnce(secondCopy.promise);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+  render(<IdGeneratorTool />);
+
+  await user.clear(screen.getByRole('spinbutton', { name: '生成数量' }));
+  await user.type(screen.getByRole('spinbutton', { name: '生成数量' }), '2');
+  await user.click(screen.getByRole('button', { name: '生成标识符' }));
+  await user.click(screen.getByRole('button', { name: '复制第 1 个标识符' }));
+  await user.click(screen.getByRole('button', { name: '复制第 2 个标识符' }));
+
+  await act(async () => secondCopy.resolve());
+  const newestAnnouncement = screen.getByRole('status');
+  expect(newestAnnouncement).toHaveTextContent('第 2 个标识符已复制');
+
+  await act(async () => firstCopy.resolve());
+  expect(screen.getByRole('status')).toBe(newestAnnouncement);
+  expect(screen.getByRole('status')).toHaveTextContent('第 2 个标识符已复制');
+});
+
+test('discards pending copy feedback after the generated batch or controls become obsolete', async () => {
+  const user = userEvent.setup();
+  const batchCopy = deferred<void>();
+  const controlCopy = deferred<void>();
+  const writeText = vi.fn()
+    .mockReturnValueOnce(batchCopy.promise)
+    .mockReturnValueOnce(controlCopy.promise);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+  render(<IdGeneratorTool />);
+
+  await user.click(screen.getByRole('button', { name: '生成标识符' }));
+  await user.click(screen.getByRole('button', { name: '复制第 1 个标识符' }));
+  await user.click(screen.getByRole('button', { name: '生成标识符' }));
+  await act(async () => batchCopy.resolve());
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: '复制第 1 个标识符' }));
+  await user.selectOptions(screen.getByRole('combobox', { name: '标识符类型' }), 'uuid-v7');
+  await act(async () => controlCopy.resolve());
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
 
 test('inspects UUID v4, UUID v7, and ULID types with only available time metadata', async () => {
