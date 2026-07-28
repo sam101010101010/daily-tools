@@ -137,6 +137,26 @@ test('WHOIS is one registry-driven RDAP tool searchable by its domain registrati
   await expect(whois[0].load()).resolves.toHaveProperty('default');
 });
 
+test('ID generator is one local registry tool searchable by UUID, GUID, and ULID terms', async () => {
+  const idGenerator = registry.filter(t => t.id === 'id-generator');
+  expect(idGenerator).toHaveLength(1);
+  expect(new Set(registry.map(t => t.id)).size).toBe(registry.length);
+  expect(idGenerator[0]).toMatchObject({
+    id: 'id-generator',
+    name: 'UUID / ULID 生成器',
+    category: '开发',
+    keywords: ['UUID', 'GUID', 'ULID', '唯一标识', '随机', '时间有序'],
+  });
+  expect(idGenerator[0].backend).toBeUndefined();
+  expect(searchTools(registry, 'UUID').map(t => t.id)).toContain('id-generator');
+  expect(searchTools(registry, 'guid').map(t => t.id)).toEqual(['id-generator']);
+  expect(searchTools(registry, 'ulid').map(t => t.id)).toEqual(['id-generator']);
+  expect(searchTools(registry, '唯一标识').map(t => t.id)).toEqual(['id-generator']);
+  expect(searchTools(registry, '随机').map(t => t.id)).toContain('id-generator');
+  expect(searchTools(registry, '时间有序').map(t => t.id)).toEqual(['id-generator']);
+  await expect(idGenerator[0].load()).resolves.toHaveProperty('default');
+});
+
 test('IP CIDR calculator is one local registry tool searchable by subnet terms', async () => {
   const ipCidr = registry.filter(t => t.id === 'ip-cidr');
   expect(ipCidr).toHaveLength(1);
