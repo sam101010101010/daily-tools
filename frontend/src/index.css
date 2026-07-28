@@ -1527,11 +1527,16 @@ main section .cron__field-legend li {
   border-top: 1px solid var(--border);
 }
 
-.cron__section-head {
+.cron .cron__section-head {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.7rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .cron__section-head h2 {
@@ -1570,11 +1575,14 @@ main section .cron__explanation li {
   font-weight: 650;
 }
 
-.cron__table-wrap {
+.cron .cron__table-wrap {
   max-width: 100%;
+  padding: 0;
   overflow-x: auto;
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  box-shadow: none;
 }
 
 .cron__table-wrap table {
