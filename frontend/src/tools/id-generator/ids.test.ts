@@ -83,6 +83,20 @@ describe('inspectId', () => {
     });
   });
 
+  test('decodes the epoch from a UUID v7 generated at a frozen time', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    const [id] = generateIds({ kind: 'uuid-v7' });
+
+    expect(inspectId(id)).toEqual({
+      kind: 'uuid-v7',
+      canonical: id,
+      version: 7,
+      variant: 'RFC_4122',
+      timestamp: Date.parse('2030-01-01T00:00:00.000Z'),
+    });
+  });
+
   test('decodes the first 48 UUID v7 timestamp bits without using the random bits', () => {
     expect(decodeUuidV7Timestamp('01a2ce8b-d400-7fff-bfff-ffffffffffff')).toBe(
       Date.parse('2027-01-01T00:00:00.000Z'),
@@ -121,6 +135,13 @@ describe('inspectId', () => {
 
   test('returns a stable invalid error for a malformed UUID v4', () => {
     expect(inspectId('550e8400-e29b-41d4-7716-446655440000')).toEqual({
+      kind: 'invalid',
+      errorCode: 'INVALID_ID',
+    });
+  });
+
+  test('returns a stable invalid error for a syntactically valid unsupported UUID version', () => {
+    expect(inspectId('6ba7b810-9dad-11d1-80b4-00c04fd430c8')).toEqual({
       kind: 'invalid',
       errorCode: 'INVALID_ID',
     });
