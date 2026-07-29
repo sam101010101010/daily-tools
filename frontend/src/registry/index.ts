@@ -9,6 +9,7 @@ import { urlMeta } from '../tools/url/meta';
 import { hashMeta } from '../tools/hash/meta';
 import { regexpMeta } from '../tools/regexp/meta';
 import { whoisMeta } from '../tools/whois/meta';
+import { cronMeta } from '../tools/cron/meta';
 import { idGeneratorMeta } from '../tools/id-generator/meta';
 import { ipCidrMeta } from '../tools/ip-cidr/meta';
 
@@ -23,6 +24,7 @@ export const tools: ToolMeta[] = [
   hashMeta,
   regexpMeta,
   whoisMeta,
+  cronMeta,
   idGeneratorMeta,
   ipCidrMeta,
 ];

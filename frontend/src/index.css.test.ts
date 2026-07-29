@@ -38,4 +38,10 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/\.hash__digest\s*\{[^}]*overflow-wrap:\s*anywhere/);
     expect(css).toMatch(/@media \(max-width: 560px\)\s*\{[\s\S]*\.hash__controls\s*\{[\s\S]*grid-template-columns:\s*1fr/);
   });
+
+  it('keeps Cron nested surfaces unframed and stacks controls at 390px', () => {
+    expect(css).toMatch(/\.cron \.cron__section-head\s*\{[^}]*box-shadow:\s*none/);
+    expect(css).toMatch(/\.cron \.cron__table-wrap\s*\{[^}]*padding:\s*0[^}]*box-shadow:\s*none/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.cron__expression-row,[\s\S]*\.cron__field-legend\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+  });
 });
