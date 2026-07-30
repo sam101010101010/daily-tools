@@ -74,14 +74,12 @@ test.each(['linux-vixie', 'macos-bsd'] as const)('%s rejects macros and question
   expect(parseCron(profile, '0 9 ? * *')).toMatchObject({ ok: false, error: { profile, code: 'unsupported' } });
 });
 
-test('macOS/BSD rejects named month and weekday tokens', () => {
-  expect(parseCron('macos-bsd', '0 9 * JAN MON')).toEqual({
-    ok: false,
-    error: {
+test('macOS/BSD accepts named month and weekday tokens with lists, ranges, and steps', () => {
+  expect(parseCron('macos-bsd', '*/15 9-17 1,15 JAN-MAR MON-FRI')).toMatchObject({
+    ok: true,
+    value: {
       profile: 'macos-bsd',
-      field: 'month',
-      code: 'invalid-value',
-      message: '字段值无效',
+      normalized: '*/15 9-17 1,15 JAN-MAR MON-FRI',
     },
   });
 });

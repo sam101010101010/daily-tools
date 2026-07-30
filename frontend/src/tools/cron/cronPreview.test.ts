@@ -97,16 +97,24 @@ test('previews a Kubernetes macro with the selected profile and its five-field a
   expect(result.value.runs[0]?.iso).toBe('2024-01-02T00:00:00.000Z');
 });
 
-test('Kubernetes previews Sunday 0, Saturday 6, and DOM/DOW OR with its own weekday map', () => {
-  const sunday = preview('0 0 * * 0', 'UTC', '2024-01-01T00:00:00.000Z', 'kubernetes');
-  const saturday = preview('0 0 * * 6', 'UTC', '2024-01-01T00:00:00.000Z', 'kubernetes');
+test.each([
+  [0, '2024-01-07T00:00:00.000Z'],
+  [1, '2024-01-08T00:00:00.000Z'],
+  [2, '2024-01-02T00:00:00.000Z'],
+  [3, '2024-01-03T00:00:00.000Z'],
+  [4, '2024-01-04T00:00:00.000Z'],
+  [5, '2024-01-05T00:00:00.000Z'],
+  [6, '2024-01-06T00:00:00.000Z'],
+] as const)('Kubernetes previews weekday %i with its 0–6 Sunday-to-Saturday mapping', (weekday, expectedIso) => {
+  const result = preview(`0 0 * * ${weekday}`, 'UTC', '2024-01-01T00:00:00.000Z', 'kubernetes');
+  isPreview(result);
+  expect(result.value.runs[0]?.iso).toBe(expectedIso);
+});
+
+test('Kubernetes previews DOM/DOW OR with its own weekday map', () => {
   const domDow = preview('0 0 1 * 1', 'UTC', '2024-01-02T00:00:00.000Z', 'kubernetes');
-  isPreview(sunday);
-  isPreview(saturday);
   isPreview(domDow);
 
-  expect(sunday.value.runs[0]?.iso).toBe('2024-01-07T00:00:00.000Z');
-  expect(saturday.value.runs[0]?.iso).toBe('2024-01-06T00:00:00.000Z');
   expect(domDow.value.runs.slice(0, 5).map((run) => run.iso)).toEqual([
     '2024-01-08T00:00:00.000Z',
     '2024-01-15T00:00:00.000Z',

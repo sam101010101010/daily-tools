@@ -95,14 +95,6 @@ const LINUX_FIELDS: readonly FieldDefinition[] = [
   { name: 'dayOfWeek', minimum: 0, maximum: 7, names: WEEKDAYS },
 ];
 
-const MACOS_FIELDS: readonly FieldDefinition[] = [
-  { name: 'minute', minimum: 0, maximum: 59 },
-  { name: 'hour', minimum: 0, maximum: 23 },
-  { name: 'dayOfMonth', minimum: 1, maximum: 31 },
-  { name: 'month', minimum: 1, maximum: 12 },
-  { name: 'dayOfWeek', minimum: 0, maximum: 7 },
-];
-
 const KUBERNETES_FIELDS: readonly FieldDefinition[] = [
   { name: 'minute', minimum: 0, maximum: 59 },
   { name: 'hour', minimum: 0, maximum: 23 },
@@ -122,7 +114,6 @@ const KUBERNETES_MACROS: Readonly<Record<string, string>> = {
 };
 
 function definitionsFor(profile: FiveFieldProfileId): readonly FieldDefinition[] {
-  if (profile === 'macos-bsd') return MACOS_FIELDS;
   if (profile === 'kubernetes') return KUBERNETES_FIELDS;
   return LINUX_FIELDS;
 }
