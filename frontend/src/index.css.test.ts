@@ -44,4 +44,12 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/\.cron \.cron__table-wrap\s*\{[^}]*padding:\s*0[^}]*box-shadow:\s*none/);
     expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.cron__expression-row,[\s\S]*\.cron__field-legend\s*\{[\s\S]*grid-template-columns:\s*1fr/);
   });
+
+  it('styles Cron profile context and lets six and seven field legends wrap', () => {
+    expect(css).toMatch(/\.cron__profile-selector\s*\{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.cron__profile-notice\s*\{[^}]*var\(--accent-weak\)/);
+    expect(css).toMatch(/\.cron__profile-required\s*\{[^}]*var\(--text-muted\)/);
+    expect(css).toMatch(/\.cron__field-legend\s*\{[^}]*repeat\(auto-fit, minmax\(8rem, 1fr\)\)/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.cron__profile-selector\s*\{[\s\S]*width:\s*100%/);
+  });
 });

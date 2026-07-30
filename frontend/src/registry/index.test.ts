@@ -137,7 +137,7 @@ test('WHOIS is one registry-driven RDAP tool searchable by its domain registrati
   await expect(whois[0].load()).resolves.toHaveProperty('default');
 });
 
-test('Cron helper is one local registry tool searchable by its exact terms', async () => {
+test('Cron helper is one local registry tool searchable by its dialect terms', async () => {
   const cron = registry.filter(t => t.id === 'cron');
   expect(cron).toHaveLength(1);
   expect(new Set(registry.map(t => t.id)).size).toBe(registry.length);
@@ -145,10 +145,10 @@ test('Cron helper is one local registry tool searchable by its exact terms', asy
     id: 'cron',
     name: 'Cron 表达式助手',
     category: '开发',
-    keywords: ['cron', 'crontab', '定时', '计划任务', '表达式', '时区'],
+    keywords: expect.arrayContaining(['cron', 'crontab', '定时', '计划任务', '表达式', '时区', 'spring', 'quartz', 'kubernetes', 'eventbridge']),
   });
   expect(cron[0].backend).toBeUndefined();
-  for (const keyword of ['cron', 'crontab', '定时', '计划任务', '表达式', '时区']) {
+  for (const keyword of ['cron', 'crontab', '定时', '计划任务', '表达式', '时区', 'spring', 'quartz', 'kubernetes', 'eventbridge']) {
     expect(searchTools(registry, keyword).map(t => t.id)).toContain('cron');
   }
   await expect(cron[0].load()).resolves.toHaveProperty('default');
