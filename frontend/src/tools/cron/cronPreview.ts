@@ -1,5 +1,5 @@
 import { Cron } from 'croner';
-import type { FiveFieldCron } from './cronSyntax';
+import type { FiveFieldCron } from './profileSyntax';
 
 const IANA_TIME_ZONE_NAME = /^(?:UTC|[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z][A-Za-z0-9._+-]*)+)$/;
 

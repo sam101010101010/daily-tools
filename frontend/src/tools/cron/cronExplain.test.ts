@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import { explainCron } from './cronExplain';
-import { parseFiveFieldCron } from './cronSyntax';
+import { parseCron } from './profileSyntax';
 
 function explain(expression: string): string[] {
-  const parsed = parseFiveFieldCron(expression);
+  const parsed = parseCron('linux-vixie', expression);
   if (!parsed.ok) throw new Error(`Expected a valid expression: ${expression}`);
   return explainCron(parsed.value);
 }

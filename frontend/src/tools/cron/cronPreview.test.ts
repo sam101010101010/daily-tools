@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import { previewCron } from './cronPreview';
-import { parseFiveFieldCron } from './cronSyntax';
+import { parseCron } from './profileSyntax';
 
-function preview(expression: string, timeZone: string, now: string) {
-  const parsed = parseFiveFieldCron(expression);
+function preview(expression: string, timeZone: string, now: string, profile: 'linux-vixie' | 'macos-bsd' = 'linux-vixie') {
+  const parsed = parseCron(profile, expression);
   if (!parsed.ok) throw new Error(`Expected a valid expression: ${expression}`);
   return previewCron(parsed.value, timeZone, new Date(now));
 }
@@ -65,6 +65,27 @@ test('uses OR semantics when day-of-month and day-of-week are both restricted', 
     '2024-01-29T00:00:00.000Z', '2024-02-01T00:00:00.000Z',
   ]);
 });
+
+test.each(['linux-vixie', 'macos-bsd'] as const)(
+  '%s keeps Sunday 0/7 equivalence and DOM/DOW OR semantics',
+  (profile) => {
+    const sundayZero = preview('0 0 * * 0', 'UTC', '2024-01-01T00:00:00.000Z', profile);
+    const sundaySeven = preview('0 0 * * 7', 'UTC', '2024-01-01T00:00:00.000Z', profile);
+    const domDow = preview('0 0 1 * MON', 'UTC', '2024-01-02T00:00:00.000Z', profile);
+    isPreview(sundayZero);
+    isPreview(sundaySeven);
+    isPreview(domDow);
+
+    expect(sundayZero.value.runs.map((run) => run.iso)).toEqual(sundaySeven.value.runs.map((run) => run.iso));
+    expect(domDow.value.runs.slice(0, 5).map((run) => run.iso)).toEqual([
+      '2024-01-08T00:00:00.000Z',
+      '2024-01-15T00:00:00.000Z',
+      '2024-01-22T00:00:00.000Z',
+      '2024-01-29T00:00:00.000Z',
+      '2024-02-01T00:00:00.000Z',
+    ]);
+  },
+);
 
 test('skips DST gap occurrences and lists an overlap only once in America/New_York', () => {
   const spring = preview('30 2 * * *', 'America/New_York', '2024-03-09T00:00:00.000Z');

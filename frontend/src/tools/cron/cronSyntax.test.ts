@@ -5,6 +5,7 @@ test('normalizes whitespace and returns a typed five-field AST', () => {
   expect(parseFiveFieldCron('  */15   9-17  1,15  JAN-MAR  mon-fri  ')).toEqual({
     ok: true,
     value: {
+      profile: 'linux-vixie',
       normalized: '*/15 9-17 1,15 JAN-MAR MON-FRI',
       fields: [
         { name: 'minute', node: { kind: 'step', base: { kind: 'wildcard' }, step: 15 } },
@@ -21,6 +22,7 @@ test('parses a wildcard, list, ascending range, and step nodes', () => {
   expect(parseFiveFieldCron('* 1,2,23 1-31/2 * 0,7')).toEqual({
     ok: true,
     value: {
+      profile: 'linux-vixie',
       normalized: '* 1,2,23 1-31/2 * 0,7',
       fields: [
         { name: 'minute', node: { kind: 'wildcard' } },
