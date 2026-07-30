@@ -457,11 +457,12 @@ function parseAdvancedProfile<Profile extends AdvancedProfileId>(profile: Profil
   const fields = normalized === '' ? [] : normalized.toUpperCase().split(' ');
   const validation = validateAdvancedFields(profile, fields);
   if (!validation.ok) return validation;
+  const dayOfWeekIndex = isEventBridge ? 4 : 5;
+  if (fields[dayOfWeekIndex] === 'L') {
+    return { ok: true, value: { profile, normalized, fieldValues: fields } };
+  }
   try {
-    const evaluatorFields = [...fields];
-    const dayOfWeekIndex = isEventBridge ? 4 : 5;
-    if (evaluatorFields[dayOfWeekIndex] === 'L') evaluatorFields[dayOfWeekIndex] = '1L';
-    const evaluatorNormalized = evaluatorFields.join(' ').replace(/\bL-(?:[1-9]|[12]\d|30)\b/, 'L');
+    const evaluatorNormalized = normalized.replace(/\bL-(?:[1-9]|[12]\d|30)\b/, 'L');
     const evaluatorPattern = isEventBridge ? `0 ${evaluatorNormalized}` : evaluatorNormalized;
     new Cron(evaluatorPattern, {
       paused: true,
