@@ -226,6 +226,9 @@ function parseFiveFieldProfile<Profile extends FiveFieldProfileId>(
   input: string,
 ): ParseFiveFieldProfileResult<Profile> {
   let normalized = input.trim().replace(/\s+/g, ' ');
+  if (/^cron\(/i.test(normalized)) {
+    return fiveFieldFailure(profile, 'expression', 'unsupported', '此 Cron 方言不使用 cron(...) 外壳');
+  }
   if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(normalized)) {
     return fiveFieldFailure(profile, 'expression', 'unsupported', 'Cron 表达式不支持环境变量前缀');
   }
