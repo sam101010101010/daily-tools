@@ -1,12 +1,24 @@
 import { expect, test } from 'vitest';
 import { explainCron } from './cronExplain';
-import { parseFiveFieldCron } from './cronSyntax';
+import { parseCron } from './profileSyntax';
 
-function explain(expression: string): string[] {
-  const parsed = parseFiveFieldCron(expression);
+function explain(expression: string): readonly string[] {
+  const parsed = parseCron('linux-vixie', expression);
   if (!parsed.ok) throw new Error(`Expected a valid expression: ${expression}`);
-  return explainCron(parsed.value);
+  return explainCron(parsed.value).lines;
 }
+
+test.each(['linux-vixie', 'macos-bsd'] as const)(
+  'preserves the selected %s profile in the explanation result',
+  (profile) => {
+    const parsed = parseCron(profile, profile === 'macos-bsd' ? '0 9 * * 1-5' : '0 9 * * MON-FRI');
+    if (!parsed.ok) throw new Error(`Expected a valid ${profile} expression`);
+
+    const result = explainCron(parsed.value);
+    expect(result.profile).toBe(profile);
+    expect(result.lines.slice(0, 2)).toEqual(['分钟：00 分', '小时：09 时']);
+  },
+);
 
 test('explains an every-minute schedule deterministically', () => {
   expect(explain('* * * * *')).toEqual([

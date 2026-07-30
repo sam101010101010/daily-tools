@@ -1,4 +1,5 @@
-import type { CronBaseNode, CronFieldName, CronMemberNode, CronNode, FiveFieldCron } from './cronSyntax';
+import type { CronBaseNode, CronFieldName, CronMemberNode, CronNode, ParsedCron, ParsedFiveFieldCron } from './profileSyntax';
+import type { CronProfileId } from './profiles';
 
 const WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const;
 
@@ -77,7 +78,12 @@ function isRestricted(node: CronNode, values: readonly number[], minimum: number
   return !values.every((value) => matchesNode(node, value, minimum));
 }
 
-export function explainCron(cron: FiveFieldCron): string[] {
+export type CronExplanation = Readonly<{
+  profile: CronProfileId;
+  lines: readonly string[];
+}>;
+
+function explainFiveFieldCron(cron: ParsedFiveFieldCron): CronExplanation {
   const lines = cron.fields.map(({ name, node }) => {
     const label: Record<CronFieldName, string> = {
       minute: '分钟', hour: '小时', dayOfMonth: '日期', month: '月份', dayOfWeek: '星期',
@@ -89,5 +95,60 @@ export function explainCron(cron: FiveFieldCron): string[] {
     isRestricted(dayOfWeek.node, [0, 1, 2, 3, 4, 5, 6], 0)) {
     lines.push('日期和星期均受限时，任一条件满足即可执行');
   }
-  return lines;
+  return { profile: cron.profile, lines };
+}
+
+const ADVANCED_FIELD_LABELS: Record<string, string> = {
+  second: '秒',
+  minute: '分钟',
+  hour: '小时',
+  dayOfMonth: '日期',
+  month: '月份',
+  dayOfWeek: '星期',
+  year: '年份',
+};
+
+const SPRING_WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'] as const;
+const SUNDAY_FIRST_WEEKDAYS = ['', '星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const;
+
+function advancedWeekdayText(profile: Exclude<CronProfileId, 'linux-vixie' | 'macos-bsd' | 'kubernetes'>, value: string): string {
+  const atom = (token: string): string => {
+    if (!/^\d+$/.test(token)) return token;
+    const weekday = profile === 'spring' ? SPRING_WEEKDAYS[Number(token)] : SUNDAY_FIRST_WEEKDAYS[Number(token)];
+    return weekday ? `${token}（${weekday}）` : token;
+  };
+  return value.split(',').map((member) => {
+    if (member === 'L') return 'L（最后一个星期值）';
+    const nth = /^(.+)#([1-5])$/.exec(member);
+    if (nth) return `${atom(nth[1])}的第 ${nth[2]} 个`;
+    const last = /^(.+)L$/.exec(member);
+    if (last) return `${atom(last[1])}的最后一个`;
+    const range = /^(.+)-(.+)$/.exec(member);
+    if (range) return `${atom(range[1])}至 ${atom(range[2])}`;
+    return atom(member);
+  }).join('、');
+}
+
+export function explainCron(cron: ParsedCron): CronExplanation {
+  if ('fields' in cron) return explainFiveFieldCron(cron);
+  const fieldOrder = cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy'
+    ? ['minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year']
+    : cron.fieldValues.length === 7
+      ? ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year']
+      : ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek'];
+  const lines = cron.fieldValues.map((value, index) => {
+    const field = fieldOrder[index];
+    const description = field === 'dayOfWeek' ? advancedWeekdayText(cron.profile, value) : value;
+    return `${ADVANCED_FIELD_LABELS[field]}：${description}`;
+  });
+  if (cron.profile === 'spring') {
+    const dayOfMonth = cron.fieldValues[3];
+    const dayOfWeek = cron.fieldValues[5];
+    if (dayOfMonth === '?') lines.push('日期字段 ? 表示未指定；Spring 以日期和星期条件同时约束');
+    if (dayOfWeek === '?') lines.push('星期字段 ? 表示未指定；Spring 以日期和星期条件同时约束');
+  }
+  if (cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy' || cron.profile === 'quartz') {
+    lines.push('日期和星期字段使用 ? 明确未指定项');
+  }
+  return { profile: cron.profile, lines };
 }

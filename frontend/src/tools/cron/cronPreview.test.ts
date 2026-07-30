@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import { previewCron } from './cronPreview';
-import { parseFiveFieldCron } from './cronSyntax';
+import { parseCron } from './profileSyntax';
 
-function preview(expression: string, timeZone: string, now: string) {
-  const parsed = parseFiveFieldCron(expression);
+function preview(expression: string, timeZone: string, now: string, profile: 'linux-vixie' | 'macos-bsd' | 'kubernetes' = 'linux-vixie') {
+  const parsed = parseCron(profile, expression);
   if (!parsed.ok) throw new Error(`Expected a valid expression: ${expression}`);
   return previewCron(parsed.value, timeZone, new Date(now));
 }
@@ -66,6 +66,103 @@ test('uses OR semantics when day-of-month and day-of-week are both restricted', 
   ]);
 });
 
+test.each(['linux-vixie', 'macos-bsd'] as const)(
+  '%s keeps Sunday 0/7 equivalence and DOM/DOW OR semantics',
+  (profile) => {
+    const sundayZero = preview('0 0 * * 0', 'UTC', '2024-01-01T00:00:00.000Z', profile);
+    const sundaySeven = preview('0 0 * * 7', 'UTC', '2024-01-01T00:00:00.000Z', profile);
+    const domDow = preview(profile === 'linux-vixie' ? '0 0 1 * MON' : '0 0 1 * 1', 'UTC', '2024-01-02T00:00:00.000Z', profile);
+    isPreview(sundayZero);
+    isPreview(sundaySeven);
+    isPreview(domDow);
+
+    expect(sundayZero.value.runs.map((run) => run.iso)).toEqual(sundaySeven.value.runs.map((run) => run.iso));
+    expect(domDow.value.runs.slice(0, 5).map((run) => run.iso)).toEqual([
+      '2024-01-08T00:00:00.000Z',
+      '2024-01-15T00:00:00.000Z',
+      '2024-01-22T00:00:00.000Z',
+      '2024-01-29T00:00:00.000Z',
+      '2024-02-01T00:00:00.000Z',
+    ]);
+  },
+);
+
+test('previews a Kubernetes macro with the selected profile and its five-field adapter', () => {
+  const parsed = parseCron('kubernetes', '@daily');
+  if (!parsed.ok) throw new Error('Expected Kubernetes macro to parse');
+
+  const result = previewCron(parsed.value, 'UTC', new Date('2024-01-01T00:01:00.000Z'));
+  expect(result).toMatchObject({ ok: true, profile: 'kubernetes' });
+  if (!result.ok) throw new Error('Expected Kubernetes preview to succeed');
+  expect(result.value.runs[0]?.iso).toBe('2024-01-02T00:00:00.000Z');
+});
+
+test.each([
+  [0, '2024-01-07T00:00:00.000Z'],
+  [1, '2024-01-08T00:00:00.000Z'],
+  [2, '2024-01-02T00:00:00.000Z'],
+  [3, '2024-01-03T00:00:00.000Z'],
+  [4, '2024-01-04T00:00:00.000Z'],
+  [5, '2024-01-05T00:00:00.000Z'],
+  [6, '2024-01-06T00:00:00.000Z'],
+] as const)('Kubernetes previews weekday %i with its 0–6 Sunday-to-Saturday mapping', (weekday, expectedIso) => {
+  const result = preview(`0 0 * * ${weekday}`, 'UTC', '2024-01-01T00:00:00.000Z', 'kubernetes');
+  isPreview(result);
+  expect(result.value.runs[0]?.iso).toBe(expectedIso);
+});
+
+test('Kubernetes previews DOM/DOW OR with its own weekday map', () => {
+  const domDow = preview('0 0 1 * 1', 'UTC', '2024-01-02T00:00:00.000Z', 'kubernetes');
+  isPreview(domDow);
+
+  expect(domDow.value.runs.slice(0, 5).map((run) => run.iso)).toEqual([
+    '2024-01-08T00:00:00.000Z',
+    '2024-01-15T00:00:00.000Z',
+    '2024-01-22T00:00:00.000Z',
+    '2024-01-29T00:00:00.000Z',
+    '2024-02-01T00:00:00.000Z',
+  ]);
+});
+
+test('Kubernetes keeps the profile on invalid time-zone errors and handles month boundaries and DST gaps', () => {
+  const parsed = parseCron('kubernetes', '0 0 1 * *');
+  if (!parsed.ok) throw new Error('Expected Kubernetes expression to parse');
+  expect(previewCron(parsed.value, 'Mars/Olympus', new Date('2024-01-31T23:59:00.000Z'))).toEqual({
+    ok: false,
+    profile: 'kubernetes',
+    error: '不是有效的 IANA 时区',
+  });
+
+  const boundary = preview('0 0 1 * *', 'UTC', '2024-01-31T23:59:00.000Z', 'kubernetes');
+  const dst = preview('30 2 * * *', 'America/New_York', '2024-03-09T00:00:00.000Z', 'kubernetes');
+  isPreview(boundary);
+  isPreview(dst);
+  expect(boundary.value.runs[0]).toEqual({
+    iso: '2024-02-01T00:00:00.000Z',
+    local: '2024-02-01 00:00:00 UTC',
+  });
+  expect(dst.value.runs.slice(0, 3)).toEqual([
+    { iso: '2024-03-09T07:30:00.000Z', local: '2024-03-09 02:30:00 America/New_York' },
+    { iso: '2024-03-11T06:30:00.000Z', local: '2024-03-11 02:30:00 America/New_York' },
+    { iso: '2024-03-12T06:30:00.000Z', local: '2024-03-12 02:30:00 America/New_York' },
+  ]);
+});
+
+test.each(['linux-vixie', 'macos-bsd'] as const)(
+  'preserves the selected %s profile in preview success and error results',
+  (profile) => {
+    const success = preview('0 9 * * *', 'UTC', '2024-01-01T00:00:00.000Z', profile);
+    const error = preview('0 9 * * *', 'Mars/Olympus', '2024-01-01T00:00:00.000Z', profile);
+
+    expect(success).toMatchObject({ ok: true, profile });
+    expect(error).toEqual({
+      ok: false,
+      profile,
+      error: '不是有效的 IANA 时区',
+    });
+  },
+);
+
 test('skips DST gap occurrences and lists an overlap only once in America/New_York', () => {
   const spring = preview('30 2 * * *', 'America/New_York', '2024-03-09T00:00:00.000Z');
   isPreview(spring);
@@ -98,6 +195,7 @@ test('deduplicates a shifted DST gap when the shifted wall time also matches', (
 test('rejects an invalid IANA timezone before previewing', () => {
   expect(preview('0 0 * * *', 'Mars/Olympus', '2024-01-01T00:00:00.000Z')).toEqual({
     ok: false,
+    profile: 'linux-vixie',
     error: '不是有效的 IANA 时区',
   });
 });
@@ -105,6 +203,7 @@ test('rejects an invalid IANA timezone before previewing', () => {
 test('rejects an offset identifier that Intl accepts but is not an IANA timezone name', () => {
   expect(preview('0 0 * * *', '+01:00', '2024-01-01T00:00:00.000Z')).toEqual({
     ok: false,
+    profile: 'linux-vixie',
     error: '不是有效的 IANA 时区',
   });
 });

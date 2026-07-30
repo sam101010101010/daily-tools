@@ -1,5 +1,6 @@
 import { Cron } from 'croner';
-import type { FiveFieldCron } from './cronSyntax';
+import { cronerOptionsFor, cronerPatternFor, hasBareLastDayOfWeek, hasLastDayOffset, type ParsedCron } from './profileSyntax';
+import type { CronProfileId } from './profiles';
 
 const IANA_TIME_ZONE_NAME = /^(?:UTC|[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z][A-Za-z0-9._+-]*)+)$/;
 
@@ -9,8 +10,8 @@ export type CronRun = Readonly<{
 }>;
 
 export type CronPreviewResult =
-  | Readonly<{ ok: true; value: Readonly<{ timeZone: string; runs: readonly CronRun[] }> }>
-  | Readonly<{ ok: false; error: string }>;
+  | Readonly<{ ok: true; profile: CronProfileId; value: Readonly<{ timeZone: string; runs: readonly CronRun[] }> }>
+  | Readonly<{ ok: false; profile: CronProfileId; error: string }>;
 
 function isValidIanaTimeZone(timeZone: string): boolean {
   if (!IANA_TIME_ZONE_NAME.test(timeZone)) return false;
@@ -32,14 +33,22 @@ function formatInTimeZone(date: Date, timeZone: string): string {
   return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second} ${timeZone}`;
 }
 
-export function previewCron(cron: FiveFieldCron, timeZone: string, now: Date): CronPreviewResult {
-  if (!isValidIanaTimeZone(timeZone)) return { ok: false, error: '不是有效的 IANA 时区' };
+export function previewCron(cron: ParsedCron, timeZone: string, now: Date): CronPreviewResult {
+  if (hasLastDayOffset(cron)) {
+    return { ok: false, profile: cron.profile, error: '该 Cron 方言的 L-n 日期偏移暂不能精确预览' };
+  }
+  if (hasBareLastDayOfWeek(cron)) {
+    return { ok: false, profile: cron.profile, error: '该 Cron 方言的星期 L 值暂不能精确预览' };
+  }
+  const effectiveTimeZone = cron.profile === 'eventbridge-legacy' ? 'UTC' : timeZone;
+  if (!isValidIanaTimeZone(effectiveTimeZone)) {
+    return { ok: false, profile: cron.profile, error: '不是有效的 IANA 时区' };
+  }
 
-  const evaluator = new Cron(cron.normalized, {
-    timezone: timeZone,
+  const evaluator = new Cron(cronerPatternFor(cron), {
+    timezone: effectiveTimeZone,
     paused: true,
-    domAndDow: false,
-    mode: '5-part',
+    ...cronerOptionsFor(cron),
   });
   const dates: Date[] = [];
   const seenInstants = new Set<number>();
@@ -56,6 +65,6 @@ export function previewCron(cron: FiveFieldCron, timeZone: string, now: Date): C
       }
     }
   }
-  const runs = dates.map((date) => ({ iso: date.toISOString(), local: formatInTimeZone(date, timeZone) }));
-  return { ok: true, value: { timeZone, runs } };
+  const runs = dates.map((date) => ({ iso: date.toISOString(), local: formatInTimeZone(date, effectiveTimeZone) }));
+  return { ok: true, profile: cron.profile, value: { timeZone: effectiveTimeZone, runs } };
 }

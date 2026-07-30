@@ -1848,9 +1848,38 @@ main section .id-generator__results li {
   font-size: 0.85rem;
 }
 
+.cron__profile-selector {
+  width: 100%;
+}
+
+.cron__profile-required {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.cron__profile-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.15rem 0;
+  padding: 0.65rem 0.8rem;
+  color: var(--accent-strong);
+  background: var(--accent-weak);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+}
+
+.cron__profile-notice p { margin: 0; }
+
 .cron__expression-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 0.75rem;
 }
 
@@ -1866,7 +1895,7 @@ main section .id-generator__results li {
 
 .cron__field-legend {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   gap: 0.4rem;
   margin: 0 0 0.5rem;
   padding: 0;
@@ -2028,6 +2057,10 @@ main section .cron__explanation li {
   .cron__expression-row,
   .cron__field-legend {
     grid-template-columns: 1fr;
+  }
+
+  .cron__profile-selector {
+    width: 100%;
   }
 
   .cron__expression-row button,
