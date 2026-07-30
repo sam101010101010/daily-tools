@@ -100,7 +100,7 @@ function evaluate(expression: string, timeZone: string, now: Date): Exclude<View
     return {
       kind: 'success',
       normalized: parsed.value.normalized,
-      explanation: explainCron(parsed.value),
+      explanation: explainCron(parsed.value).lines,
       runs: preview.value.runs,
     };
   } catch {

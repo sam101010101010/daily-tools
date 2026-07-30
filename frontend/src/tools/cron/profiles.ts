@@ -153,5 +153,7 @@ export function isCronProfileId(value: string): value is CronProfileId {
 }
 
 export function getCronProfile(profile: CronProfileId): (typeof CRON_PROFILES)[number] {
-  return CRON_PROFILES.find((candidate) => candidate.id === profile)!;
+  const result = CRON_PROFILES.find((candidate) => candidate.id === profile);
+  if (!result) throw new Error(`Unknown Cron profile: ${profile}`);
+  return result;
 }

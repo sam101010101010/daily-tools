@@ -1,4 +1,5 @@
 import type { CronBaseNode, CronFieldName, CronMemberNode, CronNode, FiveFieldCron } from './profileSyntax';
+import type { CronProfileId } from './profiles';
 
 const WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const;
 
@@ -77,7 +78,12 @@ function isRestricted(node: CronNode, values: readonly number[], minimum: number
   return !values.every((value) => matchesNode(node, value, minimum));
 }
 
-export function explainCron(cron: FiveFieldCron): string[] {
+export type CronExplanation = Readonly<{
+  profile: CronProfileId;
+  lines: readonly string[];
+}>;
+
+export function explainCron(cron: FiveFieldCron): CronExplanation {
   const lines = cron.fields.map(({ name, node }) => {
     const label: Record<CronFieldName, string> = {
       minute: '分钟', hour: '小时', dayOfMonth: '日期', month: '月份', dayOfWeek: '星期',
@@ -89,5 +95,5 @@ export function explainCron(cron: FiveFieldCron): string[] {
     isRestricted(dayOfWeek.node, [0, 1, 2, 3, 4, 5, 6], 0)) {
     lines.push('日期和星期均受限时，任一条件满足即可执行');
   }
-  return lines;
+  return { profile: cron.profile, lines };
 }

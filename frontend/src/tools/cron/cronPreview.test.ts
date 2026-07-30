@@ -87,6 +87,21 @@ test.each(['linux-vixie', 'macos-bsd'] as const)(
   },
 );
 
+test.each(['linux-vixie', 'macos-bsd'] as const)(
+  'preserves the selected %s profile in preview success and error results',
+  (profile) => {
+    const success = preview('0 9 * * *', 'UTC', '2024-01-01T00:00:00.000Z', profile);
+    const error = preview('0 9 * * *', 'Mars/Olympus', '2024-01-01T00:00:00.000Z', profile);
+
+    expect(success).toMatchObject({ ok: true, profile });
+    expect(error).toEqual({
+      ok: false,
+      profile,
+      error: '不是有效的 IANA 时区',
+    });
+  },
+);
+
 test('skips DST gap occurrences and lists an overlap only once in America/New_York', () => {
   const spring = preview('30 2 * * *', 'America/New_York', '2024-03-09T00:00:00.000Z');
   isPreview(spring);
@@ -119,6 +134,7 @@ test('deduplicates a shifted DST gap when the shifted wall time also matches', (
 test('rejects an invalid IANA timezone before previewing', () => {
   expect(preview('0 0 * * *', 'Mars/Olympus', '2024-01-01T00:00:00.000Z')).toEqual({
     ok: false,
+    profile: 'linux-vixie',
     error: '不是有效的 IANA 时区',
   });
 });
@@ -126,6 +142,7 @@ test('rejects an invalid IANA timezone before previewing', () => {
 test('rejects an offset identifier that Intl accepts but is not an IANA timezone name', () => {
   expect(preview('0 0 * * *', '+01:00', '2024-01-01T00:00:00.000Z')).toEqual({
     ok: false,
+    profile: 'linux-vixie',
     error: '不是有效的 IANA 时区',
   });
 });
