@@ -108,6 +108,15 @@ const ADVANCED_FIELD_LABELS: Record<string, string> = {
   year: '年份',
 };
 
+const SPRING_WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'] as const;
+const SUNDAY_FIRST_WEEKDAYS = ['', '星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const;
+
+function advancedWeekdayText(profile: Exclude<CronProfileId, 'linux-vixie' | 'macos-bsd' | 'kubernetes'>, value: string): string {
+  if (!/^\d+$/.test(value)) return value;
+  const weekday = profile === 'spring' ? SPRING_WEEKDAYS[Number(value)] : SUNDAY_FIRST_WEEKDAYS[Number(value)];
+  return weekday ? `${value}（${weekday}）` : value;
+}
+
 export function explainCron(cron: ParsedCron): CronExplanation {
   if ('fields' in cron) return explainFiveFieldCron(cron);
   const fieldOrder = cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy'
@@ -115,7 +124,17 @@ export function explainCron(cron: ParsedCron): CronExplanation {
     : cron.fieldValues.length === 7
       ? ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year']
       : ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek'];
-  const lines = cron.fieldValues.map((value, index) => `${ADVANCED_FIELD_LABELS[fieldOrder[index]]}：${value}`);
+  const lines = cron.fieldValues.map((value, index) => {
+    const field = fieldOrder[index];
+    const description = field === 'dayOfWeek' ? advancedWeekdayText(cron.profile, value) : value;
+    return `${ADVANCED_FIELD_LABELS[field]}：${description}`;
+  });
+  if (cron.profile === 'spring') {
+    const dayOfMonth = cron.fieldValues[3];
+    const dayOfWeek = cron.fieldValues[5];
+    if (dayOfMonth === '?') lines.push('日期字段 ? 表示未指定；Spring 以日期和星期条件同时约束');
+    if (dayOfWeek === '?') lines.push('星期字段 ? 表示未指定；Spring 以日期和星期条件同时约束');
+  }
   if (cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy' || cron.profile === 'quartz') {
     lines.push('日期和星期字段使用 ? 明确未指定项');
   }

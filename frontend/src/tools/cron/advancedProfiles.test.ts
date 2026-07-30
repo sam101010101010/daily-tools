@@ -19,6 +19,30 @@ test('Spring accepts six fields, its macros, question marks and Sunday 0 or 7', 
   expect(parse('spring', '0 0 0 ? * MON#2').normalized).toBe('0 0 0 ? * MON#2');
 });
 
+test.each([
+  ['spring', '0 0 0 L-3 * ?', '0 0 0 L-3 * ?'],
+  ['quartz', '0 0 0 L-3 * ?', '0 0 0 L-3 * ?'],
+] as const)('%s accepts a documented L-n DOM offset but does not approximate its preview', (profile, expression, normalized) => {
+  const parsed = parse(profile, expression);
+  expect(parsed.normalized).toBe(normalized);
+  expect(previewCron(parsed, 'UTC', new Date('2024-02-01T00:00:00.000Z'))).toEqual({
+    ok: false,
+    profile,
+    error: '该 Cron 方言的 L-n 日期偏移暂不能精确预览',
+  });
+});
+
+test.each([
+  ['spring', '0 0 0 L-0 * ?', 'dayOfMonth'],
+  ['spring', '0 0 0 L-32 * ?', 'dayOfMonth'],
+  ['quartz', '0 0 0 L-X * ?', 'dayOfMonth'],
+] as const)('%s rejects invalid L-n DOM offsets', (profile, expression, field) => {
+  expect(parseCron(profile, expression)).toMatchObject({
+    ok: false,
+    error: { profile, field, code: 'invalid-value' },
+  });
+});
+
 test('Spring rejects a five-field expression and Quartz weekday numbering', () => {
   expect(parseCron('spring', '0 9 * * *')).toMatchObject({
     ok: false, error: { profile: 'spring', field: 'expression', code: 'field-count' },
@@ -90,4 +114,19 @@ test('advanced profiles skip DST gaps and deduplicate overlap instants', () => {
     '2024-03-12 02:30:00 America/New_York',
   ]);
   expect(new Set(spring.value.runs.map((run) => run.iso)).size).toBe(spring.value.runs.length);
+});
+
+test('advanced explanations use each profile weekday map and describe question-mark policy in Chinese', () => {
+  const spring = explainCron(parse('spring', '0 0 9 ? * 0'));
+  const quartz = explainCron(parse('quartz', '0 0 9 ? * 1'));
+  const scheduler = explainCron(parse('eventbridge-scheduler', 'cron(0 9 ? * 1 2024)'));
+
+  expect(spring).toMatchObject({ profile: 'spring' });
+  expect(spring.lines).toContain('星期：0（星期日）');
+  expect(spring.lines).toContain('日期字段 ? 表示未指定；Spring 以日期和星期条件同时约束');
+  expect(quartz).toMatchObject({ profile: 'quartz' });
+  expect(quartz.lines).toContain('星期：1（星期日）');
+  expect(quartz.lines).toContain('日期和星期字段使用 ? 明确未指定项');
+  expect(scheduler).toMatchObject({ profile: 'eventbridge-scheduler' });
+  expect(scheduler.lines).toContain('星期：1（星期日）');
 });

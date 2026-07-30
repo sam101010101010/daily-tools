@@ -337,7 +337,8 @@ function validStandardField(
 }
 
 function validDayOfMonth(token: string): boolean {
-  return token === '?' || token === 'L' || token === 'LW' || /^([1-9]|[12]\d|3[01])W$/.test(token)
+  return token === '?' || token === 'L' || token === 'LW' || /^L-(?:[1-9]|[12]\d|30)$/.test(token)
+    || /^([1-9]|[12]\d|3[01])W$/.test(token)
     || validStandardField(token, 1, 31);
 }
 
@@ -411,6 +412,12 @@ export function cronerPatternFor(cron: ParsedCron): string {
     : cron.normalized;
 }
 
+export function hasLastDayOffset(cron: ParsedCron): boolean {
+  if ('fields' in cron) return false;
+  const dayOfMonth = cron.fieldValues[cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy' ? 2 : 3];
+  return /^L-\d+$/.test(dayOfMonth);
+}
+
 export function cronerOptionsFor(cron: ParsedCron): Readonly<{
   mode: '5-part' | '6-part' | '6-or-7-parts' | '7-part';
   alternativeWeekdays?: boolean;
@@ -441,7 +448,8 @@ function parseAdvancedProfile<Profile extends AdvancedProfileId>(profile: Profil
   const validation = validateAdvancedFields(profile, fields);
   if (!validation.ok) return validation;
   try {
-    new Cron(isEventBridge ? `0 ${normalized}` : normalized, {
+    const evaluatorPattern = (isEventBridge ? `0 ${normalized}` : normalized).replace(/\bL-(?:[1-9]|[12]\d|30)\b/, 'L');
+    new Cron(evaluatorPattern, {
       paused: true,
       ...cronOptionsFor(profile),
     });
