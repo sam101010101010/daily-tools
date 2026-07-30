@@ -1,6 +1,8 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
+import * as cronExplain from './cronExplain';
+import * as cronPreview from './cronPreview';
 import * as profileSyntax from './profileSyntax';
 import { CRON_PROFILES } from './profiles';
 import CronTool from './CronTool';
@@ -24,6 +26,8 @@ test('requires an explicit profile before it enables or interprets an expression
   expect(screen.getByRole('status')).toHaveTextContent('请先选择目标 Cron 方言');
   expect(screen.getByLabelText('Cron 表达式')).toBeDisabled();
   expect(screen.getByRole('button', { name: '生成预览' })).toBeDisabled();
+  expect(screen.queryByLabelText('IANA 时区')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Kubernetes spec.timeZone')).not.toBeInTheDocument();
   expect(screen.queryByLabelText('表达式解释')).not.toBeInTheDocument();
   expect(screen.queryByLabelText('未来 10 次运行时间')).not.toBeInTheDocument();
   expect(parseSpy).not.toHaveBeenCalled();
@@ -93,6 +97,70 @@ test('renders a selected profile on valid output and clears it before an invalid
   expect(screen.queryByLabelText('未来 10 次运行时间')).not.toBeInTheDocument();
 });
 
+test('turns a mismatched preview profile into the stable safe error without stale results', async () => {
+  const user = userEvent.setup();
+  render(<CronTool now={() => FIXED_NOW} />);
+
+  await user.selectOptions(screen.getByLabelText('Cron 方言 profile'), 'linux-vixie');
+  const realPreview = cronPreview.previewCron;
+  vi.spyOn(cronPreview, 'previewCron').mockImplementationOnce((cron, timeZone, now) => ({
+    ...realPreview(cron, timeZone, now),
+    profile: 'macos-bsd',
+  }));
+  await user.click(screen.getByRole('button', { name: '填入示例' }));
+  await user.click(screen.getByLabelText('Cron 表达式'));
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('alert')).toHaveTextContent('无法生成预览，请检查所选 Cron 方言与 IANA 时区');
+  expect(screen.queryByLabelText('未来 10 次运行时间')).not.toBeInTheDocument();
+});
+
+test('turns a mismatched explanation profile into the stable safe error without stale results', async () => {
+  const user = userEvent.setup();
+  render(<CronTool now={() => FIXED_NOW} />);
+
+  await user.selectOptions(screen.getByLabelText('Cron 方言 profile'), 'linux-vixie');
+  const realExplain = cronExplain.explainCron;
+  vi.spyOn(cronExplain, 'explainCron').mockImplementationOnce((cron) => ({
+    ...realExplain(cron),
+    profile: 'macos-bsd',
+  }));
+  await user.click(screen.getByRole('button', { name: '填入示例' }));
+  await user.click(screen.getByLabelText('Cron 表达式'));
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('alert')).toHaveTextContent('无法生成预览，请检查所选 Cron 方言与 IANA 时区');
+  expect(screen.queryByLabelText('表达式解释')).not.toBeInTheDocument();
+});
+
+test.each(['preview', 'explanation'] as const)('hides a thrown %s dependency error behind the stable safe error', async (dependency) => {
+  const user = userEvent.setup();
+  render(<CronTool now={() => FIXED_NOW} />);
+
+  await user.selectOptions(screen.getByLabelText('Cron 方言 profile'), 'linux-vixie');
+  await user.click(screen.getByRole('button', { name: '填入示例' }));
+  await user.click(screen.getByLabelText('Cron 表达式'));
+  await user.keyboard('{Enter}');
+  expect(screen.getByLabelText('未来 10 次运行时间')).toBeInTheDocument();
+
+  if (dependency === 'preview') {
+    vi.spyOn(cronPreview, 'previewCron').mockImplementationOnce(() => {
+      throw new Error('Croner exploded\\n    at dependency-stack.js:42');
+    });
+  } else {
+    vi.spyOn(cronExplain, 'explainCron').mockImplementationOnce(() => {
+      throw new Error('explainer exploded\\n    at dependency-stack.js:42');
+    });
+  }
+  await user.clear(screen.getByLabelText('Cron 表达式'));
+  await user.type(screen.getByLabelText('Cron 表达式'), '0 9 * * *');
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('alert')).toHaveTextContent('无法生成预览，请检查所选 Cron 方言与 IANA 时区');
+  expect(screen.getByRole('alert')).not.toHaveTextContent(/Croner|exploder|dependency-stack/);
+  expect(screen.queryByLabelText('未来 10 次运行时间')).not.toBeInTheDocument();
+});
+
 test('uses profile-specific time-zone controls and keeps Kubernetes time-zone out of the expression', async () => {
   const user = userEvent.setup();
   render(<CronTool now={() => FIXED_NOW} />);
@@ -131,6 +199,12 @@ test('shows wrapper and DOM/DOW context without converting an EventBridge expres
 test('submits on Enter and copies the selected profile normalized expression and runs', async () => {
   const user = userEvent.setup();
   const writeText = vi.fn().mockResolvedValue(undefined);
+  const fetchSpy = vi.fn();
+  const storageGetSpy = vi.spyOn(Storage.prototype, 'getItem');
+  const storageSetSpy = vi.spyOn(Storage.prototype, 'setItem');
+  const storageRemoveSpy = vi.spyOn(Storage.prototype, 'removeItem');
+  const storageClearSpy = vi.spyOn(Storage.prototype, 'clear');
+  vi.stubGlobal('fetch', fetchSpy);
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   render(<CronTool now={() => FIXED_NOW} />);
 
@@ -145,4 +219,9 @@ test('submits on Enter and copies the selected profile normalized expression and
   await user.click(screen.getByRole('button', { name: '复制全部运行时间' }));
   expect(writeText).toHaveBeenLastCalledWith(expect.stringContaining('UTC'));
   expect(screen.getByRole('status')).toHaveTextContent('已复制运行时间');
+  expect(fetchSpy).not.toHaveBeenCalled();
+  expect(storageGetSpy).not.toHaveBeenCalled();
+  expect(storageSetSpy).not.toHaveBeenCalled();
+  expect(storageRemoveSpy).not.toHaveBeenCalled();
+  expect(storageClearSpy).not.toHaveBeenCalled();
 });

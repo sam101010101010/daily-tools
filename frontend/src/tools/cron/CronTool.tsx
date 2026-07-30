@@ -202,7 +202,7 @@ export default function CronTool({ now = () => new Date() }: CronToolProps) {
           <button type="submit" disabled={!profile}>生成预览</button>
         </div>
 
-        {profile?.timeZoneMode !== 'utc-only' && (
+        {profile && profile.timeZoneMode !== 'utc-only' && (
           <>
             <label htmlFor="cron-time-zone">
               {profile?.timeZoneMode === 'kubernetes-spec-time-zone' ? 'Kubernetes spec.timeZone' : 'IANA 时区'}
