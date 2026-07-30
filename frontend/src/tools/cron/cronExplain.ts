@@ -1,4 +1,4 @@
-import type { CronBaseNode, CronFieldName, CronMemberNode, CronNode, FiveFieldCron } from './profileSyntax';
+import type { CronBaseNode, CronFieldName, CronMemberNode, CronNode, ParsedCron, ParsedFiveFieldCron } from './profileSyntax';
 import type { CronProfileId } from './profiles';
 
 const WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const;
@@ -83,7 +83,7 @@ export type CronExplanation = Readonly<{
   lines: readonly string[];
 }>;
 
-export function explainCron(cron: FiveFieldCron): CronExplanation {
+function explainFiveFieldCron(cron: ParsedFiveFieldCron): CronExplanation {
   const lines = cron.fields.map(({ name, node }) => {
     const label: Record<CronFieldName, string> = {
       minute: '分钟', hour: '小时', dayOfMonth: '日期', month: '月份', dayOfWeek: '星期',
@@ -94,6 +94,30 @@ export function explainCron(cron: FiveFieldCron): CronExplanation {
   if (isRestricted(dayOfMonth.node, Array.from({ length: 31 }, (_, index) => index + 1), 1) &&
     isRestricted(dayOfWeek.node, [0, 1, 2, 3, 4, 5, 6], 0)) {
     lines.push('日期和星期均受限时，任一条件满足即可执行');
+  }
+  return { profile: cron.profile, lines };
+}
+
+const ADVANCED_FIELD_LABELS: Record<string, string> = {
+  second: '秒',
+  minute: '分钟',
+  hour: '小时',
+  dayOfMonth: '日期',
+  month: '月份',
+  dayOfWeek: '星期',
+  year: '年份',
+};
+
+export function explainCron(cron: ParsedCron): CronExplanation {
+  if ('fields' in cron) return explainFiveFieldCron(cron);
+  const fieldOrder = cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy'
+    ? ['minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year']
+    : cron.fieldValues.length === 7
+      ? ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year']
+      : ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek'];
+  const lines = cron.fieldValues.map((value, index) => `${ADVANCED_FIELD_LABELS[fieldOrder[index]]}：${value}`);
+  if (cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy' || cron.profile === 'quartz') {
+    lines.push('日期和星期字段使用 ? 明确未指定项');
   }
   return { profile: cron.profile, lines };
 }

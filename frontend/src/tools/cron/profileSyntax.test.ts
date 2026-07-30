@@ -47,14 +47,9 @@ test.each([
   'eventbridge-scheduler',
   'eventbridge-legacy',
 ] as const)('does not pass %s through the legacy five-field parser', (profile) => {
-  expect(parseCron(profile, '* * * * *')).toEqual({
+  expect(parseCron(profile, '* * * * *')).toMatchObject({
     ok: false,
-    error: {
-      profile,
-      field: 'expression',
-      code: 'profile-not-implemented',
-      message: '该 Cron 方言尚未实现',
-    },
+    error: { profile, field: 'expression' },
   });
 });
 

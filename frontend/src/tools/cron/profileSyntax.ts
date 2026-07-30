@@ -34,7 +34,20 @@ export type FiveFieldCron = ParsedFiveFieldCron;
 export type ParsedCron =
   | ParsedFiveFieldCron<'linux-vixie'>
   | ParsedFiveFieldCron<'macos-bsd'>
-  | ParsedFiveFieldCron<'kubernetes'>;
+  | ParsedFiveFieldCron<'kubernetes'>
+  | ParsedAdvancedCron<'spring'>
+  | ParsedAdvancedCron<'quartz'>
+  | ParsedAdvancedCron<'eventbridge-scheduler'>
+  | ParsedAdvancedCron<'eventbridge-legacy'>;
+
+export type AdvancedProfileId = 'spring' | 'quartz' | 'eventbridge-scheduler' | 'eventbridge-legacy';
+
+export type ParsedAdvancedCron<Profile extends AdvancedProfileId = AdvancedProfileId> = Readonly<{
+  profile: Profile;
+  /** The profile-native fields, without EventBridge's required cron(...) wrapper. */
+  normalized: string;
+  fieldValues: readonly string[];
+}>;
 
 export type CronSyntaxErrorCode =
   | 'field-count'
@@ -87,6 +100,7 @@ type FieldDefinition = Readonly<{
 
 const MONTHS = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 } as const;
 const WEEKDAYS = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 } as const;
+const SUNDAY_FIRST_WEEKDAYS = { SUN: 1, MON: 2, TUE: 3, WED: 4, THU: 5, FRI: 6, SAT: 7 } as const;
 const LINUX_FIELDS: readonly FieldDefinition[] = [
   { name: 'minute', minimum: 0, maximum: 59 },
   { name: 'hour', minimum: 0, maximum: 23 },
@@ -113,18 +127,19 @@ const KUBERNETES_MACROS: Readonly<Record<string, string>> = {
   '@HOURLY': '0 * * * *',
 };
 
+const SPRING_MACROS: Readonly<Record<string, string>> = {
+  '@YEARLY': '0 0 0 1 1 *',
+  '@ANNUALLY': '0 0 0 1 1 *',
+  '@MONTHLY': '0 0 0 1 * *',
+  '@WEEKLY': '0 0 0 * * 0',
+  '@DAILY': '0 0 0 * * *',
+  '@MIDNIGHT': '0 0 0 * * *',
+  '@HOURLY': '0 0 * * * *',
+};
+
 function definitionsFor(profile: FiveFieldProfileId): readonly FieldDefinition[] {
   if (profile === 'kubernetes') return KUBERNETES_FIELDS;
   return LINUX_FIELDS;
-}
-
-function failure<Profile extends CronProfileId>(
-  profile: Profile,
-  field: CronProfileFieldName | 'expression',
-  code: CronSyntaxErrorCode,
-  message: string,
-): ParseCronResult {
-  return { ok: false, error: { profile, field, code, message } };
 }
 
 function fiveFieldFailure<Profile extends FiveFieldProfileId>(
@@ -269,9 +284,169 @@ export function parseCron(
   if (profile === 'linux-vixie' || profile === 'macos-bsd' || profile === 'kubernetes') {
     return parseFiveFieldProfile(profile, input);
   }
-  return failure(profile, 'expression', 'profile-not-implemented', '该 Cron 方言尚未实现');
+  return parseAdvancedProfile(profile, input);
 }
 
 export function parseFiveFieldCron(input: string): ParseFiveFieldCronResult {
   return parseFiveFieldProfile('linux-vixie', input);
+}
+
+function advancedFailure<Profile extends AdvancedProfileId>(
+  profile: Profile,
+  field: CronProfileFieldName | 'expression',
+  code: CronSyntaxErrorCode,
+  message: string,
+): Readonly<{ ok: false; error: ProfileSyntaxError }> {
+  return { ok: false, error: { profile, field, code, message } };
+}
+
+function unwrapEventBridge(input: string): string | undefined {
+  const match = /^cron\((.*)\)$/is.exec(input.trim());
+  return match?.[1]?.trim();
+}
+
+function valuesFromToken(token: string, names: Readonly<Record<string, number>> | undefined): number[] | undefined {
+  const valueOf = (value: string): number | undefined => {
+    const byName = names?.[value.toUpperCase()];
+    if (byName !== undefined) return byName;
+    return /^\d+$/.test(value) ? Number(value) : undefined;
+  };
+  const bare = token.split('/')[0];
+  const pieces = bare === '*' ? [] : bare.split('-');
+  if (pieces.length > 2) return undefined;
+  const values = pieces.map(valueOf);
+  if (values.some((value) => value === undefined)) return undefined;
+  if (token.includes('/')) {
+    const step = token.split('/')[1];
+    if (!/^\d+$/.test(step) || Number(step) === 0) return undefined;
+  }
+  return values as number[];
+}
+
+function validStandardField(
+  token: string,
+  minimum: number,
+  maximum: number,
+  names?: Readonly<Record<string, number>>,
+): boolean {
+  return token.split(',').every((member) => {
+    const values = valuesFromToken(member, names);
+    return values !== undefined && values.every((value) => value >= minimum && value <= maximum)
+      && (values.length !== 2 || values[0] <= values[1]);
+  });
+}
+
+function validDayOfMonth(token: string): boolean {
+  return token === '?' || token === 'L' || token === 'LW' || /^([1-9]|[12]\d|3[01])W$/.test(token)
+    || validStandardField(token, 1, 31);
+}
+
+function validDayOfWeek(token: string, minimum: number, names: Readonly<Record<string, number>>): boolean {
+  if (token === '?') return true;
+  const special = /^([A-Z]+|\d+)(?:L|#[1-5])$/i.exec(token);
+  if (special) return validStandardField(special[1], minimum, 7, names);
+  return validStandardField(token, minimum, 7, names);
+}
+
+function validYear(token: string, minimum: number, maximum: number): boolean {
+  return validStandardField(token, minimum, maximum);
+}
+
+function validateAdvancedFields<Profile extends AdvancedProfileId>(
+  profile: Profile,
+  fields: readonly string[],
+): Readonly<{ ok: true }> | Readonly<{ ok: false; error: ProfileSyntaxError }> {
+  const isEventBridge = profile === 'eventbridge-scheduler' || profile === 'eventbridge-legacy';
+  const isQuartzStyle = profile === 'quartz' || isEventBridge;
+  const expected = isEventBridge ? 6 : profile === 'spring' ? 6 : undefined;
+  const acceptsCount = expected === undefined ? fields.length === 6 || fields.length === 7 : fields.length === expected;
+  if (!acceptsCount) {
+    return advancedFailure(profile, 'expression', 'field-count', isQuartzStyle && !isEventBridge
+      ? 'Cron 表达式必须包含六或七个字段'
+      : `Cron 表达式必须恰好包含${expected}个字段`);
+  }
+  const offset = isEventBridge ? -1 : 0;
+  const names = isQuartzStyle ? SUNDAY_FIRST_WEEKDAYS : WEEKDAYS;
+  const fieldNames: readonly CronProfileFieldName[] = isEventBridge
+    ? ['minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year']
+    : ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year'];
+  const definitions: readonly [number, number, Readonly<Record<string, number>>?][] = [
+    [0, 59], [0, 59], [0, 23], [1, 31], [1, 12, MONTHS], [isQuartzStyle ? 1 : 0, 7, names], [1, 9999],
+  ];
+  for (let index = 0; index < fields.length; index += 1) {
+    const sourceIndex = index - offset;
+    const name = fieldNames[index];
+    const [minimum, maximum, fieldNamesMap] = definitions[sourceIndex];
+    const token = fields[index];
+    const valid = name === 'dayOfMonth'
+      ? validDayOfMonth(token)
+      : name === 'dayOfWeek'
+        ? validDayOfWeek(token, minimum, fieldNamesMap ?? {})
+        : name === 'year' && isEventBridge
+          ? validYear(token, 1970, 2199)
+          : validStandardField(token, minimum, maximum, fieldNamesMap);
+    if (!valid) return advancedFailure(profile, name, 'invalid-value', '字段值无效');
+  }
+  const dom = fields[isEventBridge ? 2 : 3];
+  const dow = fields[isEventBridge ? 4 : 5];
+  if (isQuartzStyle && ((dom === '?') === (dow === '?'))) {
+    return advancedFailure(profile, 'expression', 'semantic', '日期和星期字段必须且只能有一个使用 ?');
+  }
+  return { ok: true };
+}
+
+function cronOptionsFor(profile: AdvancedProfileId): Readonly<{
+  mode: '6-part' | '6-or-7-parts' | '7-part';
+  alternativeWeekdays: boolean;
+  domAndDow: boolean;
+}> {
+  if (profile === 'spring') return { mode: '6-part', alternativeWeekdays: false, domAndDow: true };
+  if (profile === 'quartz') return { mode: '6-or-7-parts', alternativeWeekdays: true, domAndDow: true };
+  return { mode: '7-part', alternativeWeekdays: true, domAndDow: true };
+}
+
+export function cronerPatternFor(cron: ParsedCron): string {
+  return cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy'
+    ? `0 ${cron.normalized}`
+    : cron.normalized;
+}
+
+export function cronerOptionsFor(cron: ParsedCron): Readonly<{
+  mode: '5-part' | '6-part' | '6-or-7-parts' | '7-part';
+  alternativeWeekdays?: boolean;
+  domAndDow: boolean;
+}> {
+  if (cron.profile === 'linux-vixie' || cron.profile === 'macos-bsd' || cron.profile === 'kubernetes') {
+    return { mode: '5-part', domAndDow: false };
+  }
+  return cronOptionsFor(cron.profile);
+}
+
+function parseAdvancedProfile<Profile extends AdvancedProfileId>(profile: Profile, input: string): ParseCronResult {
+  let normalized = input.trim().replace(/\s+/g, ' ');
+  const isEventBridge = profile === 'eventbridge-scheduler' || profile === 'eventbridge-legacy';
+  if (isEventBridge) {
+    const inner = unwrapEventBridge(input);
+    if (inner === undefined) return advancedFailure(profile, 'expression', 'unsupported', '此 Cron 方言必须使用 cron(...) 外壳');
+    normalized = inner.replace(/\s+/g, ' ');
+  } else if (/^cron\(/i.test(normalized)) {
+    return advancedFailure(profile, 'expression', 'unsupported', '此 Cron 方言不使用 cron(...) 外壳');
+  }
+  if (profile === 'spring' && normalized.startsWith('@')) {
+    const macro = SPRING_MACROS[normalized.toUpperCase()];
+    if (!macro) return advancedFailure(profile, 'expression', 'unsupported', '该 Cron 方言不支持此宏');
+    normalized = macro;
+  }
+  const fields = normalized === '' ? [] : normalized.toUpperCase().split(' ');
+  const validation = validateAdvancedFields(profile, fields);
+  if (!validation.ok) return validation;
+  try {
+    new Cron(isEventBridge ? `0 ${normalized}` : normalized, {
+      paused: true,
+      ...cronOptionsFor(profile),
+    });
+  } catch {
+    return advancedFailure(profile, 'expression', 'semantic', 'Cron 表达式的字段组合无效');
+  }
+  return { ok: true, value: { profile, normalized, fieldValues: fields } };
 }
