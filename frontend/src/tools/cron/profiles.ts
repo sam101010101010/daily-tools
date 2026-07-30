@@ -89,7 +89,7 @@ export const CRON_PROFILES = [
     id: 'macos-bsd',
     label: 'macOS/BSD crontab',
     fieldOrder: FIVE_FIELD_ORDER,
-    defaultExpression: '*/15 9-17 * * MON-FRI',
+    defaultExpression: '*/15 9-17 * * 1-5',
     wrapper: 'none',
     weekdayMap: VIXIE_WEEKDAYS,
     domDowPolicy: 'or',

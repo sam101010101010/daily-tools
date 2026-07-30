@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { CRON_PROFILE_IDS, CRON_PROFILES, getCronProfile, isCronProfileId } from './profiles';
+import { parseCron } from './profileSyntax';
 
 test('publishes the seven supported profile contracts in product order', () => {
   expect(CRON_PROFILE_IDS).toEqual([
@@ -27,7 +28,7 @@ test('publishes the seven supported profile contracts in product order', () => {
       id: 'macos-bsd',
       label: 'macOS/BSD crontab',
       fieldOrder: ['minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek'],
-      defaultExpression: '*/15 9-17 * * MON-FRI',
+      defaultExpression: '*/15 9-17 * * 1-5',
       wrapper: 'none',
       weekdayMap: { 0: 'SUN', 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT', 7: 'SUN' },
       domDowPolicy: 'or',
@@ -93,3 +94,14 @@ test('looks up only ids from the closed profile catalog', () => {
   expect(isCronProfileId('systemd')).toBe(false);
   expect(isCronProfileId('')).toBe(false);
 });
+
+test.each(['linux-vixie', 'macos-bsd', 'kubernetes'] as const)(
+  'parses the default expression of implemented %s profile with that same profile',
+  (profile) => {
+    const contract = getCronProfile(profile);
+    expect(parseCron(profile, contract.defaultExpression)).toMatchObject({
+      ok: true,
+      value: { profile },
+    });
+  },
+);
