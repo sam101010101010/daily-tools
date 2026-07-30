@@ -43,6 +43,37 @@ test.each([
   });
 });
 
+test('EventBridge rejects L-n DOM offsets before previewing', () => {
+  expect(parseCron('eventbridge-scheduler', 'cron(0 9 L-3 * ? 2024)')).toMatchObject({
+    ok: false, error: { profile: 'eventbridge-scheduler', field: 'dayOfMonth', code: 'invalid-value' },
+  });
+  expect(parseCron('eventbridge-legacy', 'cron(0 9 L-3 * ? 2024)')).toMatchObject({
+    ok: false, error: { profile: 'eventbridge-legacy', field: 'dayOfMonth', code: 'invalid-value' },
+  });
+});
+
+test.each([
+  ['spring', '0 0 9 ? * L'],
+  ['quartz', '0 0 9 ? * L'],
+  ['eventbridge-scheduler', 'cron(0 9 ? * L 2024)'],
+  ['eventbridge-legacy', 'cron(0 9 ? * L 2024)'],
+] as const)('%s accepts bare DOW L but declines an inexact preview', (profile, expression) => {
+  const parsed = parse(profile, expression);
+  expect(previewCron(parsed, 'UTC', new Date('2024-01-01T00:00:00.000Z'))).toEqual({
+    ok: false, profile, error: '该 Cron 方言的星期 L 值暂不能精确预览',
+  });
+});
+
+test.each(['eventbridge-scheduler', 'eventbridge-legacy'] as const)(
+  '%s allows one # entry but rejects multiple # entries in DOW',
+  (profile) => {
+    expect(parseCron(profile, 'cron(0 9 ? * 3#1 2024)')).toMatchObject({ ok: true, value: { profile } });
+    expect(parseCron(profile, 'cron(0 9 ? * 3#1,6#3 2024)')).toMatchObject({
+      ok: false, error: { profile, field: 'dayOfWeek', code: 'semantic' },
+    });
+  },
+);
+
 test('Spring rejects a five-field expression and Quartz weekday numbering', () => {
   expect(parseCron('spring', '0 9 * * *')).toMatchObject({
     ok: false, error: { profile: 'spring', field: 'expression', code: 'field-count' },
@@ -129,4 +160,16 @@ test('advanced explanations use each profile weekday map and describe question-m
   expect(quartz.lines).toContain('日期和星期字段使用 ? 明确未指定项');
   expect(scheduler).toMatchObject({ profile: 'eventbridge-scheduler' });
   expect(scheduler.lines).toContain('星期：1（星期日）');
+});
+
+test('advanced explanations distinguish weekday ranges and nth weekdays by selected profile', () => {
+  const springRange = explainCron(parse('spring', '0 0 9 ? * 2-6'));
+  const quartzRange = explainCron(parse('quartz', '0 0 9 ? * 2-6'));
+  const springNth = explainCron(parse('spring', '0 0 9 ? * 2#2'));
+  const quartzNth = explainCron(parse('quartz', '0 0 9 ? * 2#2'));
+
+  expect(springRange.lines).toContain('星期：2（星期二）至 6（星期六）');
+  expect(quartzRange.lines).toContain('星期：2（星期一）至 6（星期五）');
+  expect(springNth.lines).toContain('星期：2（星期二）的第 2 个');
+  expect(quartzNth.lines).toContain('星期：2（星期一）的第 2 个');
 });

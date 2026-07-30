@@ -336,14 +336,15 @@ function validStandardField(
   });
 }
 
-function validDayOfMonth(token: string): boolean {
-  return token === '?' || token === 'L' || token === 'LW' || /^L-(?:[1-9]|[12]\d|30)$/.test(token)
+function validDayOfMonth(token: string, supportsLastDayOffset: boolean): boolean {
+  return token === '?' || token === 'L' || token === 'LW'
+    || (supportsLastDayOffset && /^L-(?:[1-9]|[12]\d|30)$/.test(token))
     || /^([1-9]|[12]\d|3[01])W$/.test(token)
     || validStandardField(token, 1, 31);
 }
 
 function validDayOfWeek(token: string, minimum: number, names: Readonly<Record<string, number>>): boolean {
-  if (token === '?') return true;
+  if (token === '?' || token === 'L') return true;
   const special = /^([A-Z]+|\d+)(?:L|#[1-5])$/i.exec(token);
   if (special) return validStandardField(special[1], minimum, 7, names);
   return validStandardField(token, minimum, 7, names);
@@ -379,8 +380,11 @@ function validateAdvancedFields<Profile extends AdvancedProfileId>(
     const name = fieldNames[index];
     const [minimum, maximum, fieldNamesMap] = definitions[sourceIndex];
     const token = fields[index];
+    if (isEventBridge && name === 'dayOfWeek' && (token.match(/#/g)?.length ?? 0) > 1) {
+      return advancedFailure(profile, name, 'semantic', 'EventBridge 星期字段只允许一个 # 项');
+    }
     const valid = name === 'dayOfMonth'
-      ? validDayOfMonth(token)
+      ? validDayOfMonth(token, !isEventBridge)
       : name === 'dayOfWeek'
         ? validDayOfWeek(token, minimum, fieldNamesMap ?? {})
         : name === 'year' && isEventBridge
@@ -418,6 +422,12 @@ export function hasLastDayOffset(cron: ParsedCron): boolean {
   return /^L-\d+$/.test(dayOfMonth);
 }
 
+export function hasBareLastDayOfWeek(cron: ParsedCron): boolean {
+  if ('fields' in cron) return false;
+  const dayOfWeek = cron.fieldValues[cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy' ? 4 : 5];
+  return dayOfWeek === 'L';
+}
+
 export function cronerOptionsFor(cron: ParsedCron): Readonly<{
   mode: '5-part' | '6-part' | '6-or-7-parts' | '7-part';
   alternativeWeekdays?: boolean;
@@ -448,7 +458,11 @@ function parseAdvancedProfile<Profile extends AdvancedProfileId>(profile: Profil
   const validation = validateAdvancedFields(profile, fields);
   if (!validation.ok) return validation;
   try {
-    const evaluatorPattern = (isEventBridge ? `0 ${normalized}` : normalized).replace(/\bL-(?:[1-9]|[12]\d|30)\b/, 'L');
+    const evaluatorFields = [...fields];
+    const dayOfWeekIndex = isEventBridge ? 4 : 5;
+    if (evaluatorFields[dayOfWeekIndex] === 'L') evaluatorFields[dayOfWeekIndex] = '1L';
+    const evaluatorNormalized = evaluatorFields.join(' ').replace(/\bL-(?:[1-9]|[12]\d|30)\b/, 'L');
+    const evaluatorPattern = isEventBridge ? `0 ${evaluatorNormalized}` : evaluatorNormalized;
     new Cron(evaluatorPattern, {
       paused: true,
       ...cronOptionsFor(profile),

@@ -1,5 +1,5 @@
 import { Cron } from 'croner';
-import { cronerOptionsFor, cronerPatternFor, hasLastDayOffset, type ParsedCron } from './profileSyntax';
+import { cronerOptionsFor, cronerPatternFor, hasBareLastDayOfWeek, hasLastDayOffset, type ParsedCron } from './profileSyntax';
 import type { CronProfileId } from './profiles';
 
 const IANA_TIME_ZONE_NAME = /^(?:UTC|[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z][A-Za-z0-9._+-]*)+)$/;
@@ -36,6 +36,9 @@ function formatInTimeZone(date: Date, timeZone: string): string {
 export function previewCron(cron: ParsedCron, timeZone: string, now: Date): CronPreviewResult {
   if (hasLastDayOffset(cron)) {
     return { ok: false, profile: cron.profile, error: '该 Cron 方言的 L-n 日期偏移暂不能精确预览' };
+  }
+  if (hasBareLastDayOfWeek(cron)) {
+    return { ok: false, profile: cron.profile, error: '该 Cron 方言的星期 L 值暂不能精确预览' };
   }
   const effectiveTimeZone = cron.profile === 'eventbridge-legacy' ? 'UTC' : timeZone;
   if (!isValidIanaTimeZone(effectiveTimeZone)) {

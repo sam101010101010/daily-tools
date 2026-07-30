@@ -112,9 +112,21 @@ const SPRING_WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '�
 const SUNDAY_FIRST_WEEKDAYS = ['', '星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const;
 
 function advancedWeekdayText(profile: Exclude<CronProfileId, 'linux-vixie' | 'macos-bsd' | 'kubernetes'>, value: string): string {
-  if (!/^\d+$/.test(value)) return value;
-  const weekday = profile === 'spring' ? SPRING_WEEKDAYS[Number(value)] : SUNDAY_FIRST_WEEKDAYS[Number(value)];
-  return weekday ? `${value}（${weekday}）` : value;
+  const atom = (token: string): string => {
+    if (!/^\d+$/.test(token)) return token;
+    const weekday = profile === 'spring' ? SPRING_WEEKDAYS[Number(token)] : SUNDAY_FIRST_WEEKDAYS[Number(token)];
+    return weekday ? `${token}（${weekday}）` : token;
+  };
+  return value.split(',').map((member) => {
+    if (member === 'L') return 'L（最后一个星期值）';
+    const nth = /^(.+)#([1-5])$/.exec(member);
+    if (nth) return `${atom(nth[1])}的第 ${nth[2]} 个`;
+    const last = /^(.+)L$/.exec(member);
+    if (last) return `${atom(last[1])}的最后一个`;
+    const range = /^(.+)-(.+)$/.exec(member);
+    if (range) return `${atom(range[1])}至 ${atom(range[2])}`;
+    return atom(member);
+  }).join('、');
 }
 
 export function explainCron(cron: ParsedCron): CronExplanation {
