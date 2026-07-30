@@ -81,6 +81,7 @@ function unsupportedFeature(input: string, field: CronSyntaxError['field']): str
 
 function syntaxErrorMessage(error: CronSyntaxError, input: string): string {
   const feature = unsupportedFeature(input, error.field);
+  if (feature && error.field === 'expression') return `不支持 ${feature}。`;
   if (error.code === 'field-count') {
     if (feature) return `不支持 ${feature}。`;
     return '只支持五字段，不支持秒或年份字段。';

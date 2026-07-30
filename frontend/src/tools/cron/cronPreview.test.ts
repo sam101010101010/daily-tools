@@ -71,7 +71,7 @@ test.each(['linux-vixie', 'macos-bsd'] as const)(
   (profile) => {
     const sundayZero = preview('0 0 * * 0', 'UTC', '2024-01-01T00:00:00.000Z', profile);
     const sundaySeven = preview('0 0 * * 7', 'UTC', '2024-01-01T00:00:00.000Z', profile);
-    const domDow = preview('0 0 1 * MON', 'UTC', '2024-01-02T00:00:00.000Z', profile);
+    const domDow = preview(profile === 'linux-vixie' ? '0 0 1 * MON' : '0 0 1 * 1', 'UTC', '2024-01-02T00:00:00.000Z', profile);
     isPreview(sundayZero);
     isPreview(sundaySeven);
     isPreview(domDow);
@@ -86,6 +86,16 @@ test.each(['linux-vixie', 'macos-bsd'] as const)(
     ]);
   },
 );
+
+test('previews a Kubernetes macro with the selected profile and its five-field adapter', () => {
+  const parsed = parseCron('kubernetes', '@daily');
+  if (!parsed.ok) throw new Error('Expected Kubernetes macro to parse');
+
+  const result = previewCron(parsed.value, 'UTC', new Date('2024-01-01T00:01:00.000Z'));
+  expect(result).toMatchObject({ ok: true, profile: 'kubernetes' });
+  if (!result.ok) throw new Error('Expected Kubernetes preview to succeed');
+  expect(result.value.runs[0]?.iso).toBe('2024-01-02T00:00:00.000Z');
+});
 
 test.each(['linux-vixie', 'macos-bsd'] as const)(
   'preserves the selected %s profile in preview success and error results',

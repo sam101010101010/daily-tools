@@ -11,7 +11,7 @@ function explain(expression: string): readonly string[] {
 test.each(['linux-vixie', 'macos-bsd'] as const)(
   'preserves the selected %s profile in the explanation result',
   (profile) => {
-    const parsed = parseCron(profile, '0 9 * * MON-FRI');
+    const parsed = parseCron(profile, profile === 'macos-bsd' ? '0 9 * * 1-5' : '0 9 * * MON-FRI');
     if (!parsed.ok) throw new Error(`Expected a valid ${profile} expression`);
 
     const result = explainCron(parsed.value);

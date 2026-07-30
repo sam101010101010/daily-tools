@@ -2,7 +2,7 @@ import { Cron } from 'croner';
 import type { CronProfileFieldName, CronProfileId } from './profiles';
 
 export type CronFieldName = 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek';
-export type FiveFieldProfileId = 'linux-vixie' | 'macos-bsd';
+export type FiveFieldProfileId = 'linux-vixie' | 'macos-bsd' | 'kubernetes';
 
 export type CronBaseNode =
   | Readonly<{ kind: 'wildcard' }>
@@ -33,7 +33,8 @@ export type FiveFieldCron = ParsedFiveFieldCron;
 
 export type ParsedCron =
   | ParsedFiveFieldCron<'linux-vixie'>
-  | ParsedFiveFieldCron<'macos-bsd'>;
+  | ParsedFiveFieldCron<'macos-bsd'>
+  | ParsedFiveFieldCron<'kubernetes'>;
 
 export type CronSyntaxErrorCode =
   | 'field-count'
@@ -86,13 +87,45 @@ type FieldDefinition = Readonly<{
 
 const MONTHS = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 } as const;
 const WEEKDAYS = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 } as const;
-const FIELDS: readonly FieldDefinition[] = [
+const LINUX_FIELDS: readonly FieldDefinition[] = [
   { name: 'minute', minimum: 0, maximum: 59 },
   { name: 'hour', minimum: 0, maximum: 23 },
   { name: 'dayOfMonth', minimum: 1, maximum: 31 },
   { name: 'month', minimum: 1, maximum: 12, names: MONTHS },
   { name: 'dayOfWeek', minimum: 0, maximum: 7, names: WEEKDAYS },
 ];
+
+const MACOS_FIELDS: readonly FieldDefinition[] = [
+  { name: 'minute', minimum: 0, maximum: 59 },
+  { name: 'hour', minimum: 0, maximum: 23 },
+  { name: 'dayOfMonth', minimum: 1, maximum: 31 },
+  { name: 'month', minimum: 1, maximum: 12 },
+  { name: 'dayOfWeek', minimum: 0, maximum: 7 },
+];
+
+const KUBERNETES_FIELDS: readonly FieldDefinition[] = [
+  { name: 'minute', minimum: 0, maximum: 59 },
+  { name: 'hour', minimum: 0, maximum: 23 },
+  { name: 'dayOfMonth', minimum: 1, maximum: 31 },
+  { name: 'month', minimum: 1, maximum: 12, names: MONTHS },
+  { name: 'dayOfWeek', minimum: 0, maximum: 6, names: WEEKDAYS },
+];
+
+const KUBERNETES_MACROS: Readonly<Record<string, string>> = {
+  '@YEARLY': '0 0 1 1 *',
+  '@ANNUALLY': '0 0 1 1 *',
+  '@MONTHLY': '0 0 1 * *',
+  '@WEEKLY': '0 0 * * 0',
+  '@DAILY': '0 0 * * *',
+  '@MIDNIGHT': '0 0 * * *',
+  '@HOURLY': '0 * * * *',
+};
+
+function definitionsFor(profile: FiveFieldProfileId): readonly FieldDefinition[] {
+  if (profile === 'macos-bsd') return MACOS_FIELDS;
+  if (profile === 'kubernetes') return KUBERNETES_FIELDS;
+  return LINUX_FIELDS;
+}
 
 function failure<Profile extends CronProfileId>(
   profile: Profile,
@@ -186,21 +219,36 @@ function parseFiveFieldProfile<Profile extends FiveFieldProfileId>(
   profile: Profile,
   input: string,
 ): ParseFiveFieldProfileResult<Profile> {
-  const normalized = input.trim().replace(/\s+/g, ' ');
+  let normalized = input.trim().replace(/\s+/g, ' ');
+  if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(normalized)) {
+    return fiveFieldFailure(profile, 'expression', 'unsupported', 'Cron 表达式不支持环境变量前缀');
+  }
+  if (normalized.startsWith('@')) {
+    const macro = profile === 'kubernetes' ? KUBERNETES_MACROS[normalized.toUpperCase()] : undefined;
+    if (!macro) return fiveFieldFailure(profile, 'expression', 'unsupported', '该 Cron 方言不支持此宏');
+    normalized = macro;
+  }
   const rawFields = normalized === '' ? [] : normalized.split(' ');
   if (rawFields.length !== 5) {
     return fiveFieldFailure(profile, 'expression', 'field-count', 'Cron 表达式必须恰好包含五个字段');
   }
 
+  if (profile === 'kubernetes') {
+    for (const index of [2, 4]) {
+      if (rawFields[index] === '?') rawFields[index] = '*';
+    }
+  }
+
   const fields: CronNode[] = [];
-  for (let index = 0; index < FIELDS.length; index += 1) {
-    const definition = FIELDS[index];
+  const definitions = definitionsFor(profile);
+  for (let index = 0; index < definitions.length; index += 1) {
+    const definition = definitions[index];
     const node = parseField(profile, rawFields[index], definition);
     if (isFailure<Profile>(node)) return node;
     fields.push(node);
   }
 
-  const upperCaseExpression = normalized.toUpperCase();
+  const upperCaseExpression = rawFields.join(' ').toUpperCase();
   try {
     new Cron(upperCaseExpression, { paused: true, domAndDow: false, mode: '5-part' });
   } catch {
@@ -227,7 +275,7 @@ export function parseCron(
   profile: CronProfileId,
   input: string,
 ): ParseCronResult {
-  if (profile === 'linux-vixie' || profile === 'macos-bsd') {
+  if (profile === 'linux-vixie' || profile === 'macos-bsd' || profile === 'kubernetes') {
     return parseFiveFieldProfile(profile, input);
   }
   return failure(profile, 'expression', 'profile-not-implemented', '该 Cron 方言尚未实现');
