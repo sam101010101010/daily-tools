@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import readablePngDataUrl from './fixtures/readable.png?inline';
 import { startQrDecode } from './qrDecodeClient';
 
 class FakeCanvas {
@@ -22,8 +23,10 @@ class MockWorker {
 
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
-  readonly postMessage = vi.fn((_message: unknown, _transfer?: Transferable[]) => {
+  readonly receivedMessages: unknown[] = [];
+  readonly postMessage = vi.fn((message: unknown, transfer: Transferable[] = []) => {
     if (MockWorker.postMessageError) throw MockWorker.postMessageError;
+    this.receivedMessages.push(structuredClone(message, { transfer }));
   });
   readonly terminate = vi.fn();
 
@@ -47,6 +50,12 @@ function handlers() {
     onNotFound: vi.fn(),
     onError: vi.fn(),
   };
+}
+
+function readableFile(name = 'readable.png', type = 'image/png'): File {
+  const [, base64] = readablePngDataUrl.split(',');
+  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+  return new File([bytes], name, { type });
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -100,12 +109,8 @@ describe('QR decode client', () => {
   });
 
   it('accepts browser-decodable PNG bytes despite mismatched MIME and extension metadata', async () => {
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'mislabeled.txt',
-      { type: 'text/plain' },
-    );
-    const bitmap = { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap;
+    const file = readableFile('mislabeled.txt', 'text/plain');
+    const bitmap = { width: 198, height: 198, close: vi.fn() } as unknown as ImageBitmap;
     vi.mocked(createImageBitmap).mockResolvedValue(bitmap);
 
     cancellations.push(startQrDecode(file, handlers()));
@@ -119,7 +124,7 @@ describe('QR decode client', () => {
     };
 
     expect(createImageBitmap).toHaveBeenCalledWith(file);
-    expect(message).toMatchObject({ type: 'decode', width: 2, height: 2 });
+    expect(message).toMatchObject({ type: 'decode', width: 198, height: 198 });
     expect(canvases).toHaveLength(1);
   });
 
@@ -186,11 +191,7 @@ describe('QR decode client', () => {
 
   it('rejects decoded dimensions above 4096 before allocating a canvas', async () => {
     const callbacks = handlers();
-    const file = new File(
-      [Uint8Array.of(0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50)],
-      'wide.webp',
-      { type: 'image/webp' },
-    );
+    const file = readableFile('wide.png');
     const bitmap = { width: 4097, height: 1, close: vi.fn() } as unknown as ImageBitmap;
     vi.mocked(createImageBitmap).mockResolvedValue(bitmap);
 
@@ -203,13 +204,9 @@ describe('QR decode client', () => {
     expect(MockWorker.instances).toHaveLength(0);
   });
 
-  it('transfers pixel ownership and releases bitmap/canvas memory without object URLs', async () => {
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'pixels.png',
-      { type: 'image/png' },
-    );
-    const bitmap = { width: 3, height: 2, close: vi.fn() } as unknown as ImageBitmap;
+  it('structured-clones transferred pixels, detaches the sender, and preserves receiver bytes', async () => {
+    const file = readableFile('pixels.png');
+    const bitmap = { width: 198, height: 198, close: vi.fn() } as unknown as ImageBitmap;
     const createObjectUrl = vi.spyOn(URL, 'createObjectURL');
     const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL');
     vi.mocked(createImageBitmap).mockResolvedValue(bitmap);
@@ -220,10 +217,15 @@ describe('QR decode client', () => {
     const canvas = canvases[0];
     const imageData = canvas.context.getImageData.mock.results[0].value;
     const worker = MockWorker.instances[0];
+    const postedMessage = worker.postMessage.mock.calls[0][0] as { pixels: ArrayBuffer };
 
-    expect(worker.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ pixels: imageData.data.buffer }),
-      [imageData.data.buffer],
+    expect(postedMessage.pixels.byteLength).toBe(0);
+    expect(imageData.data.byteLength).toBe(0);
+    expect(worker.receivedMessages).toHaveLength(1);
+    const receivedMessage = worker.receivedMessages[0] as { pixels: ArrayBuffer };
+    expect(receivedMessage.pixels.byteLength).toBe(198 * 198 * 4);
+    expect(Array.from(new Uint8ClampedArray(receivedMessage.pixels))).toEqual(
+      Array(198 * 198 * 4).fill(255),
     );
     expect(bitmap.close).toHaveBeenCalledOnce();
     expect(canvas).toMatchObject({ width: 0, height: 0 });
@@ -233,11 +235,7 @@ describe('QR decode client', () => {
 
   it('returns decoded worker text unchanged as untrusted plain text and terminates', async () => {
     const callbacks = handlers();
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'plain-text.png',
-      { type: 'image/png' },
-    );
+    const file = readableFile('plain-text.png');
     vi.mocked(createImageBitmap).mockResolvedValue(
       { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap,
     );
@@ -254,7 +252,6 @@ describe('QR decode client', () => {
   });
 
   it('cancels the prior job on replacement and makes its late Worker result inert', async () => {
-    const bytes = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
     const oldCallbacks = handlers();
     const newCallbacks = handlers();
     vi.mocked(createImageBitmap)
@@ -265,12 +262,12 @@ describe('QR decode client', () => {
         { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap,
       );
 
-    cancellations.push(startQrDecode(new File([bytes], 'old.png'), oldCallbacks));
+    cancellations.push(startQrDecode(readableFile('old.png'), oldCallbacks));
     await vi.waitFor(() => expect(MockWorker.instances).toHaveLength(1));
     const oldWorker = MockWorker.instances[0];
     const oldJobId = (oldWorker.postMessage.mock.calls[0][0] as { jobId: string }).jobId;
 
-    cancellations.push(startQrDecode(new File([bytes], 'new.png'), newCallbacks));
+    cancellations.push(startQrDecode(readableFile('new.png'), newCallbacks));
     await vi.waitFor(() => expect(MockWorker.instances).toHaveLength(2));
     const newWorker = MockWorker.instances[1];
     const newJobId = (newWorker.postMessage.mock.calls[0][0] as { jobId: string }).jobId;
@@ -285,11 +282,7 @@ describe('QR decode client', () => {
 
   it('makes cancellation safe while browser decoding is pending and closes a late bitmap', async () => {
     const callbacks = handlers();
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'pending.png',
-      { type: 'image/png' },
-    );
+    const file = readableFile('pending.png');
     const bitmap = { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap;
     let resolveBitmap: ((value: ImageBitmap) => void) | undefined;
     vi.mocked(createImageBitmap).mockReturnValue(new Promise((resolve) => {
@@ -312,11 +305,7 @@ describe('QR decode client', () => {
 
   it('ignores a late browser-decode rejection after cancellation', async () => {
     const callbacks = handlers();
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'cancelled-rejection.png',
-      { type: 'image/png' },
-    );
+    const file = readableFile('cancelled-rejection.png');
     let rejectBitmap: ((reason: unknown) => void) | undefined;
     vi.mocked(createImageBitmap).mockReturnValue(new Promise((_resolve, reject) => {
       rejectBitmap = reject;
@@ -363,13 +352,7 @@ describe('QR decode client', () => {
     vi.useFakeTimers();
     try {
       const callbacks = handlers();
-      const header = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
-      const file = {
-        name: 'timeout.png',
-        type: 'image/png',
-        size: header.byteLength,
-        slice: () => ({ arrayBuffer: async () => header.buffer }),
-      } as unknown as File;
+      const file = readableFile('timeout.png');
       vi.mocked(createImageBitmap).mockResolvedValue(
         { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap,
       );
@@ -392,11 +375,7 @@ describe('QR decode client', () => {
 
   it('maps native Worker errors to a fixed local error and ignores later messages', async () => {
     const callbacks = handlers();
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'worker-error.png',
-      { type: 'image/png' },
-    );
+    const file = readableFile('worker-error.png');
     vi.mocked(createImageBitmap).mockResolvedValue(
       { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap,
     );
@@ -418,11 +397,7 @@ describe('QR decode client', () => {
     'maps Worker %s failures and still releases decoded image resources',
     async (failure) => {
       const callbacks = handlers();
-      const file = new File(
-        [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-        `${failure}.png`,
-        { type: 'image/png' },
-      );
+      const file = readableFile(`${failure}.png`);
       const bitmap = { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap;
       vi.mocked(createImageBitmap).mockResolvedValue(bitmap);
       if (failure === 'constructor') {
@@ -443,13 +418,72 @@ describe('QR decode client', () => {
     },
   );
 
+  it('closes the decoded bitmap when canvas construction fails', async () => {
+    const callbacks = handlers();
+    const file = readableFile('canvas-construction.png');
+    const bitmap = { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap;
+    vi.mocked(createImageBitmap).mockResolvedValue(bitmap);
+    vi.mocked(document.createElement).mockImplementationOnce(() => {
+      throw new Error('canvas construction failed');
+    });
+
+    cancellations.push(startQrDecode(file, callbacks));
+
+    await vi.waitFor(() => expect(callbacks.onError).toHaveBeenCalled());
+    expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(callbacks.onError).toHaveBeenCalledWith('二维码解析失败，请重试。');
+    expect(MockWorker.instances).toHaveLength(0);
+  });
+
+  it('keeps Worker completion live when one canvas-release operation throws', async () => {
+    const callbacks = handlers();
+    const file = readableFile('canvas-release.png');
+    const bitmap = { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap;
+    const canvas = new FakeCanvas();
+    let width = 0;
+    let height = 0;
+    let widthReleaseAttempts = 0;
+    Object.defineProperty(canvas, 'width', {
+      configurable: true,
+      get: () => width,
+      set: (value: number) => {
+        if (value === 0 && width > 0) {
+          widthReleaseAttempts += 1;
+          throw new Error('width release failed');
+        }
+        width = value;
+      },
+    });
+    Object.defineProperty(canvas, 'height', {
+      configurable: true,
+      get: () => height,
+      set: (value: number) => {
+        height = value;
+      },
+    });
+    vi.mocked(document.createElement).mockReturnValueOnce(
+      canvas as unknown as HTMLCanvasElement,
+    );
+    vi.mocked(createImageBitmap).mockResolvedValue(bitmap);
+
+    cancellations.push(startQrDecode(file, callbacks));
+    await vi.waitFor(() => expect(MockWorker.instances).toHaveLength(1));
+    const worker = MockWorker.instances[0];
+    const received = worker.receivedMessages[0] as { jobId: string };
+
+    worker.emit({ type: 'success', jobId: received.jobId, text: 'decoded' });
+
+    expect(callbacks.onSuccess).toHaveBeenCalledWith('decoded');
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(widthReleaseAttempts).toBe(1);
+    expect(height).toBe(0);
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+
   it('forwards the typed not-found outcome and terminates the Worker', async () => {
     const callbacks = handlers();
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'no-code.png',
-      { type: 'image/png' },
-    );
+    const file = readableFile('no-code.png');
     vi.mocked(createImageBitmap).mockResolvedValue(
       { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap,
     );
@@ -471,11 +505,7 @@ describe('QR decode client', () => {
 
   it('sanitizes Worker error messages before reporting them locally', async () => {
     const callbacks = handlers();
-    const file = new File(
-      [Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
-      'decode-error.png',
-      { type: 'image/png' },
-    );
+    const file = readableFile('decode-error.png');
     vi.mocked(createImageBitmap).mockResolvedValue(
       { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap,
     );

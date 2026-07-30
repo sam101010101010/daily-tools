@@ -38,25 +38,60 @@ function hasSupportedSignature(bytes: Uint8Array): boolean {
   return isPng || isJpeg || isWebp;
 }
 
-function closeBitmap(bitmap: ImageBitmap): void {
-  try {
-    bitmap.close();
-  } catch {
-    // Cleanup failures must not expose native details or prevent other cleanup.
-  }
-}
+type JobResources = {
+  bitmap?: ImageBitmap;
+  canvas?: HTMLCanvasElement;
+  worker?: Worker;
+  timeoutId?: ReturnType<typeof setTimeout>;
+};
 
-function terminateWorker(worker: Worker): void {
-  try {
-    worker.terminate();
-  } catch {
-    // Cleanup failures must not expose native details or prevent other cleanup.
+function cleanupJob(resources: JobResources, scope: 'image' | 'all' = 'all'): void {
+  const bitmap = resources.bitmap;
+  resources.bitmap = undefined;
+  if (bitmap) {
+    try {
+      bitmap.close();
+    } catch {
+      // Continue reclaiming the remaining resources.
+    }
   }
-}
 
-function releaseCanvas(canvas: HTMLCanvasElement): void {
-  canvas.width = 0;
-  canvas.height = 0;
+  const canvas = resources.canvas;
+  resources.canvas = undefined;
+  if (canvas) {
+    try {
+      canvas.width = 0;
+    } catch {
+      // Height still needs its independent cleanup attempt.
+    }
+    try {
+      canvas.height = 0;
+    } catch {
+      // Canvas memory will otherwise be reclaimed by the browser.
+    }
+  }
+
+  if (scope === 'image') return;
+
+  const timeoutId = resources.timeoutId;
+  resources.timeoutId = undefined;
+  if (timeoutId !== undefined) {
+    try {
+      clearTimeout(timeoutId);
+    } catch {
+      // Continue to Worker cleanup.
+    }
+  }
+
+  const worker = resources.worker;
+  resources.worker = undefined;
+  if (worker) {
+    try {
+      worker.terminate();
+    } catch {
+      // Native cleanup details are never exposed to the caller.
+    }
+  }
 }
 
 export function startQrDecode(file: File, handlers: QrDecodeHandlers): () => void {
@@ -67,75 +102,69 @@ export function startQrDecode(file: File, handlers: QrDecodeHandlers): () => voi
     return () => undefined;
   }
 
-  let worker: Worker | undefined;
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const resources: JobResources = {};
   let isActive = true;
   const jobId = `qr-decode-${++nextJobId}`;
-  const cancel = () => {
+  const finish = (deliver?: () => void) => {
     if (!isActive) return;
     isActive = false;
-    if (timeoutId !== undefined) clearTimeout(timeoutId);
-    if (worker) terminateWorker(worker);
+    cleanupJob(resources);
     if (cancelActiveJob === cancel) cancelActiveJob = undefined;
+    deliver?.();
   };
+  const cancel = () => finish();
   cancelActiveJob = cancel;
 
   void (async () => {
-    let bitmap: ImageBitmap;
+    let header: Uint8Array;
     try {
-      const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-      if (!isActive) return;
-      if (!hasSupportedSignature(header)) {
-        if (!isActive) return;
-        isActive = false;
-        if (cancelActiveJob === cancel) cancelActiveJob = undefined;
-        handlers.onError('请选择 PNG、JPEG 或 WebP 图片');
-        return;
-      }
-      try {
-        bitmap = await createImageBitmap(file);
-      } catch {
-        if (!isActive) return;
-        isActive = false;
-        if (cancelActiveJob === cancel) cancelActiveJob = undefined;
-        handlers.onError('图片无法读取，请选择有效的 PNG、JPEG 或 WebP 文件');
-        return;
-      }
-      if (!isActive) {
-        closeBitmap(bitmap);
-        return;
-      }
-      if (bitmap.width > MAX_IMAGE_DIMENSION || bitmap.height > MAX_IMAGE_DIMENSION) {
-        closeBitmap(bitmap);
-        isActive = false;
-        if (cancelActiveJob === cancel) cancelActiveJob = undefined;
-        handlers.onError('图片宽高不能超过 4096 像素');
-        return;
-      }
-      const canvas = document.createElement('canvas');
-      try {
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Canvas 2D context unavailable');
-        context.drawImage(bitmap, 0, 0);
-        const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    } catch {
+      finish(() => handlers.onError('图片无法读取，请选择有效的 PNG、JPEG 或 WebP 文件'));
+      return;
+    }
+    if (!isActive) return;
+    if (!hasSupportedSignature(header)) {
+      finish(() => handlers.onError('请选择 PNG、JPEG 或 WebP 图片'));
+      return;
+    }
 
-        worker = new Worker(new URL('./qr.worker.ts', import.meta.url), { type: 'module' });
-        timeoutId = setTimeout(() => {
-          if (!isActive) return;
-          isActive = false;
-          if (worker) terminateWorker(worker);
-          if (cancelActiveJob === cancel) cancelActiveJob = undefined;
-          handlers.onError('二维码解析超时，请尝试更小的图片');
-        }, QR_DECODE_TIMEOUT_MS);
-        worker.onmessage = (event: MessageEvent<QrDecodeWorkerMessage>) => {
-          const message = event.data;
-          if (!isActive || message.jobId !== jobId) return;
-          isActive = false;
-          if (timeoutId !== undefined) clearTimeout(timeoutId);
-          if (worker) terminateWorker(worker);
-          if (cancelActiveJob === cancel) cancelActiveJob = undefined;
+    try {
+      resources.bitmap = await createImageBitmap(file);
+    } catch {
+      finish(() => handlers.onError('图片无法读取，请选择有效的 PNG、JPEG 或 WebP 文件'));
+      return;
+    }
+    if (!isActive) {
+      cleanupJob(resources, 'image');
+      return;
+    }
+
+    const bitmap = resources.bitmap;
+    if (bitmap.width > MAX_IMAGE_DIMENSION || bitmap.height > MAX_IMAGE_DIMENSION) {
+      finish(() => handlers.onError('图片宽高不能超过 4096 像素'));
+      return;
+    }
+
+    try {
+      resources.canvas = document.createElement('canvas');
+      resources.canvas.width = bitmap.width;
+      resources.canvas.height = bitmap.height;
+      const context = resources.canvas.getContext('2d');
+      if (!context) throw new Error('Canvas 2D context unavailable');
+      context.drawImage(bitmap, 0, 0);
+      const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height);
+
+      resources.worker = new Worker(new URL('./qr.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      resources.timeoutId = setTimeout(() => {
+        finish(() => handlers.onError('二维码解析超时，请尝试更小的图片'));
+      }, QR_DECODE_TIMEOUT_MS);
+      resources.worker.onmessage = (event: MessageEvent<QrDecodeWorkerMessage>) => {
+        const message = event.data;
+        if (!isActive || message.jobId !== jobId) return;
+        finish(() => {
           if (message.type === 'success') {
             handlers.onSuccess(message.text);
           } else if (message.type === 'not-found') {
@@ -143,40 +172,23 @@ export function startQrDecode(file: File, handlers: QrDecodeHandlers): () => voi
           } else {
             handlers.onError('二维码解析失败，请重试。');
           }
-        };
-        worker.onerror = () => {
-          if (!isActive) return;
-          isActive = false;
-          if (timeoutId !== undefined) clearTimeout(timeoutId);
-          if (worker) terminateWorker(worker);
-          if (cancelActiveJob === cancel) cancelActiveJob = undefined;
-          handlers.onError('二维码解析失败，请重试。');
-        };
-        const startMessage = {
-          type: 'decode',
-          jobId,
-          width: bitmap.width,
-          height: bitmap.height,
-          pixels: imageData.data.buffer,
-        } as const;
-        worker.postMessage(startMessage, [imageData.data.buffer]);
-      } catch {
-        if (timeoutId !== undefined) clearTimeout(timeoutId);
-        if (worker) terminateWorker(worker);
-        if (isActive) {
-          isActive = false;
-          if (cancelActiveJob === cancel) cancelActiveJob = undefined;
-          handlers.onError('二维码解析失败，请重试。');
-        }
-      } finally {
-        closeBitmap(bitmap);
-        releaseCanvas(canvas);
-      }
+        });
+      };
+      resources.worker.onerror = () => {
+        finish(() => handlers.onError('二维码解析失败，请重试。'));
+      };
+      const startMessage = {
+        type: 'decode',
+        jobId,
+        width: bitmap.width,
+        height: bitmap.height,
+        pixels: imageData.data.buffer,
+      } as const;
+      resources.worker.postMessage(startMessage, [imageData.data.buffer]);
     } catch {
-      if (!isActive) return;
-      isActive = false;
-      if (cancelActiveJob === cancel) cancelActiveJob = undefined;
-      handlers.onError('图片无法读取，请选择有效的 PNG、JPEG 或 WebP 文件');
+      finish(() => handlers.onError('二维码解析失败，请重试。'));
+    } finally {
+      cleanupJob(resources, 'image');
     }
   })();
 
