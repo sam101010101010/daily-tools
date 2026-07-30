@@ -139,6 +139,26 @@ test('maps dependency failures to a stable error without leaking raw stack text 
   expect(screen.queryByLabelText('未来 10 次运行时间')).not.toBeInTheDocument();
 });
 
+test('retains one matching profile through parsing, explanation, preview, and rendered success state', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<CronTool now={() => FIXED_NOW} />);
+
+  expect(container.querySelector('.cron__results')).toHaveAttribute('data-cron-profile', 'linux-vixie');
+
+  const realPreviewCron = cronPreview.previewCron;
+  vi.spyOn(cronPreview, 'previewCron').mockImplementationOnce((cron, timeZone, now) => {
+    const result = realPreviewCron(cron, timeZone, now);
+    return { ...result, profile: 'macos-bsd' };
+  });
+
+  await user.clear(screen.getByLabelText('Cron 表达式'));
+  await user.type(screen.getByLabelText('Cron 表达式'), '0 9 * * *');
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('alert')).toHaveTextContent('无法生成预览，请检查五字段表达式与 IANA 时区');
+  expect(container.querySelector('.cron__results')).not.toBeInTheDocument();
+});
+
 test('submits from the keyboard and copies the normalized expression and all rendered runs', async () => {
   const user = userEvent.setup();
   const writeText = vi.fn().mockResolvedValue(undefined);

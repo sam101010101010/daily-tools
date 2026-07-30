@@ -3,6 +3,7 @@ import { ErrorView } from '../../components/ErrorView';
 import { copyText } from '../../lib/copy';
 import { explainCron } from './cronExplain';
 import { previewCron, type CronRun } from './cronPreview';
+import type { CronProfileId } from './profiles';
 import { parseFiveFieldCron, type CronSyntaxError } from './cronSyntax';
 
 const DEFAULT_EXPRESSION = '*/15 9-17 * * MON-FRI';
@@ -36,6 +37,7 @@ const FIELD_INDEX: Partial<Record<CronSyntaxError['field'], number>> = {
 
 type SuccessView = Readonly<{
   kind: 'success';
+  profile: CronProfileId;
   normalized: string;
   explanation: readonly string[];
   runs: readonly CronRun[];
@@ -94,13 +96,18 @@ function evaluate(expression: string, timeZone: string, now: Date): Exclude<View
     const parsed = parseFiveFieldCron(expression);
     if (!parsed.ok) return { kind: 'error', message: syntaxErrorMessage(parsed.error, expression) };
 
+    const explanation = explainCron(parsed.value);
     const preview = previewCron(parsed.value, timeZone, now);
+    if (parsed.value.profile !== explanation.profile || parsed.value.profile !== preview.profile) {
+      return { kind: 'error', message: PREVIEW_FAILURE };
+    }
     if (!preview.ok) return { kind: 'error', message: `时区：${preview.error}。` };
 
     return {
       kind: 'success',
+      profile: parsed.value.profile,
       normalized: parsed.value.normalized,
-      explanation: explainCron(parsed.value).lines,
+      explanation: explanation.lines,
       runs: preview.value.runs,
     };
   } catch {
@@ -175,7 +182,7 @@ export default function CronTool({ now = () => new Date() }: CronToolProps) {
       {view?.kind === 'error' && <ErrorView message={view.message} />}
 
       {view?.kind === 'success' && (
-        <div className="cron__results">
+        <div className="cron__results" data-cron-profile={view.profile}>
           <section className="cron__explanation">
             <div className="cron__section-head">
               <h2>表达式解释</h2>
