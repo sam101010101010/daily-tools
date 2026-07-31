@@ -210,3 +210,20 @@ test('IP CIDR calculator is one local registry tool searchable by subnet terms',
   );
   await expect(ipCidr[0].load()).resolves.toHaveProperty('default');
 });
+
+test('QR tool is one local registry entry searchable by generation and image-recognition terms', async () => {
+  const qr = registry.filter(t => t.id === 'qr');
+  expect(qr).toHaveLength(1);
+  expect(new Set(registry.map(t => t.id)).size).toBe(registry.length);
+  expect(qr[0]).toMatchObject({
+    id: 'qr',
+    name: '二维码工具',
+    category: '编码',
+    keywords: ['QR', '二维码', '生成', '识别', '扫码', '图片'],
+  });
+  expect(qr[0].backend).toBeUndefined();
+  for (const query of ['QR', '二维码', '生成', '识别', '扫码', '图片']) {
+    expect(searchTools(registry, query).map(t => t.id)).toContain('qr');
+  }
+  await expect(qr[0].load()).resolves.toHaveProperty('default');
+});
