@@ -14,6 +14,7 @@ const ECC_MAPPING: Readonly<Record<QrEcc, QrRuntimeEcc>> = Object.freeze({
 
 const MAX_TEXT_BYTES = 4 * 1024;
 const QUIET_ZONE = 4;
+const PNG_MODULE_SCALE = 4;
 
 export type QrGenerationErrorCode =
   | 'QR_EMPTY_INPUT'
@@ -86,20 +87,22 @@ export function createQrSvg(qr: GeneratedQr): string {
 }
 
 export function createQrPngSource(qr: GeneratedQr): QrPngSource {
-  const width = qr.matrix[0]?.length ?? 0;
-  const height = qr.matrix.length;
+  const width = (qr.matrix[0]?.length ?? 0) * PNG_MODULE_SCALE;
+  const height = qr.matrix.length * PNG_MODULE_SCALE;
   const rgba = new Uint8ClampedArray(width * height * 4);
 
-  qr.matrix.forEach((row, y) => {
-    row.forEach((module, x) => {
+  for (let y = 0; y < height; y += 1) {
+    const row = qr.matrix[Math.floor(y / PNG_MODULE_SCALE)];
+    for (let x = 0; x < width; x += 1) {
+      const module = row[Math.floor(x / PNG_MODULE_SCALE)];
       const offset = (y * width + x) * 4;
       const color = module ? 0 : 255;
       rgba[offset] = color;
       rgba[offset + 1] = color;
       rgba[offset + 2] = color;
       rgba[offset + 3] = 255;
-    });
-  });
+    }
+  }
 
   return Object.freeze({ width, height, rgba });
 }

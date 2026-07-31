@@ -71,8 +71,8 @@ test('generates the selected ECC matrix only on request and draws an accessible 
   await user.click(screen.getByRole('button', { name: '生成二维码' }));
 
   const preview = screen.getByRole('img', { name: '二维码预览' });
-  expect(preview).toHaveAttribute('width', '37');
-  expect(preview).toHaveAttribute('height', '37');
+  expect(preview).toHaveAttribute('width', '148');
+  expect(preview).toHaveAttribute('height', '148');
   expect(putImageData).toHaveBeenCalledOnce();
   expect(screen.getByRole('status')).toHaveTextContent('二维码已生成，纠错级别 H');
   expect(fetch).not.toHaveBeenCalled();

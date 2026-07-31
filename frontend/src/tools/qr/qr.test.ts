@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { decodeQR } from 'qr/decode.js';
 import {
   QrGenerationError,
   createPngDownload,
@@ -163,13 +164,24 @@ describe('QR source and download helpers', () => {
     expect(svg).not.toContain('alert(1)');
   });
 
-  it('creates a canvas-ready PNG source from matrix modules alone', () => {
+  it('creates a canvas-ready PNG source at a deterministic four-pixel module scale', () => {
     const source = createQrPngSource(generateQr('A'));
 
-    expect(source.width).toBe(29);
-    expect(source.height).toBe(29);
-    expect(source.rgba).toHaveLength(29 * 29 * 4);
+    expect(source.width).toBe(116);
+    expect(source.height).toBe(116);
+    expect(source.rgba).toHaveLength(116 * 116 * 4);
     expect(Object.isFrozen(source)).toBe(true);
+  });
+
+  it('round-trips the public default payload through the production PNG raster', () => {
+    const text = 'https://example.com';
+    const source = createQrPngSource(generateQr(text));
+
+    expect(decodeQR({
+      width: source.width,
+      height: source.height,
+      data: source.rgba,
+    })).toBe(text);
   });
 
   it('creates fixed-name SVG object URLs and revokes them on request', () => {
