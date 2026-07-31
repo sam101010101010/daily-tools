@@ -8,6 +8,7 @@ export type QrDecodeHandlers = Readonly<{
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 4096;
+const MAX_DECODE_PIXELS = 4_194_304;
 const QR_DECODE_TIMEOUT_MS = 1_500;
 let nextJobId = 0;
 let cancelActiveJob: (() => void) | undefined;
@@ -36,6 +37,19 @@ function hasSupportedSignature(bytes: Uint8Array): boolean {
     && bytes[10] === 0x42
     && bytes[11] === 0x50;
   return isPng || isJpeg || isWebp;
+}
+
+export function calculateDecodeDimensions(
+  width: number,
+  height: number,
+): Readonly<{ width: number; height: number }> {
+  if (width * height <= MAX_DECODE_PIXELS) return { width, height };
+
+  const scale = Math.sqrt(MAX_DECODE_PIXELS / (width * height));
+  return {
+    width: Math.max(1, Math.floor(width * scale)),
+    height: Math.max(1, Math.floor(height * scale)),
+  };
 }
 
 type JobResources = {
@@ -145,15 +159,16 @@ export function startQrDecode(file: File, handlers: QrDecodeHandlers): () => voi
       finish(() => handlers.onError('图片宽高不能超过 4096 像素'));
       return;
     }
+    const target = calculateDecodeDimensions(bitmap.width, bitmap.height);
 
     try {
       resources.canvas = document.createElement('canvas');
-      resources.canvas.width = bitmap.width;
-      resources.canvas.height = bitmap.height;
-      const context = resources.canvas.getContext('2d');
+      resources.canvas.width = target.width;
+      resources.canvas.height = target.height;
+      const context = resources.canvas.getContext('2d', { willReadFrequently: true });
       if (!context) throw new Error('Canvas 2D context unavailable');
-      context.drawImage(bitmap, 0, 0);
-      const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      context.drawImage(bitmap, 0, 0, target.width, target.height);
+      const imageData = context.getImageData(0, 0, target.width, target.height);
 
       resources.worker = new Worker(new URL('./qr.worker.ts', import.meta.url), {
         type: 'module',
@@ -180,8 +195,8 @@ export function startQrDecode(file: File, handlers: QrDecodeHandlers): () => voi
       const startMessage = {
         type: 'decode',
         jobId,
-        width: bitmap.width,
-        height: bitmap.height,
+        width: target.width,
+        height: target.height,
         pixels: imageData.data.buffer,
       } as const;
       resources.worker.postMessage(startMessage, [imageData.data.buffer]);

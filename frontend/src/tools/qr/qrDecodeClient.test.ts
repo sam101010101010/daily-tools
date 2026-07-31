@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import readablePngDataUrl from './fixtures/readable.png?inline';
-import { startQrDecode } from './qrDecodeClient';
+import { calculateDecodeDimensions, startQrDecode } from './qrDecodeClient';
 
 class FakeCanvas {
   width = 0;
@@ -64,6 +64,48 @@ async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
 }
+
+describe('QR decode pixel cap', () => {
+  it.each([
+    { source: [198, 198], target: { width: 198, height: 198 } },
+    { source: [2048, 2048], target: { width: 2048, height: 2048 } },
+    { source: [4096, 1024], target: { width: 4096, height: 1024 } },
+  ] as const)(
+    'does not upscale or alter a $source.0×$source.1 source at or below the cap',
+    ({ source, target }) => {
+      expect(calculateDecodeDimensions(source[0], source[1])).toEqual(target);
+    },
+  );
+
+  it('reduces the 4096×4096 square worst case to 2048×2048', () => {
+    expect(calculateDecodeDimensions(4096, 4096)).toEqual({
+      width: 2048,
+      height: 2048,
+    });
+  });
+
+  it.each([
+    { source: [4096, 2048], target: { width: 2896, height: 1448 } },
+    { source: [2048, 4096], target: { width: 1448, height: 2896 } },
+  ] as const)(
+    'proportionally scales a $source.0×$source.1 source in either orientation',
+    ({ source, target }) => {
+      expect(calculateDecodeDimensions(source[0], source[1])).toEqual(target);
+      expect(target.width * target.height).toBeLessThanOrEqual(4_194_304);
+    },
+  );
+
+  it.each([
+    { source: [4096, 4095], target: { width: 2048, height: 2047 } },
+    { source: [4096, 1025], target: { width: 4094, height: 1024 } },
+  ] as const)(
+    'floors fractional target dimensions for $source.0×$source.1 without exceeding the cap',
+    ({ source, target }) => {
+      expect(calculateDecodeDimensions(source[0], source[1])).toEqual(target);
+      expect(target.width * target.height).toBeLessThanOrEqual(4_194_304);
+    },
+  );
+});
 
 describe('QR decode client', () => {
   const cancellations: Array<() => void> = [];
@@ -202,6 +244,30 @@ describe('QR decode client', () => {
     expect(bitmap.close).toHaveBeenCalledOnce();
     expect(canvases).toHaveLength(0);
     expect(MockWorker.instances).toHaveLength(0);
+  });
+
+  it('downscales a 4096×4096 source before canvas allocation and pixel transfer', async () => {
+    const file = readableFile('maximum.png');
+    const bitmap = { width: 4096, height: 4096, close: vi.fn() } as unknown as ImageBitmap;
+    vi.mocked(createImageBitmap).mockResolvedValue(bitmap);
+
+    cancellations.push(startQrDecode(file, handlers()));
+
+    await vi.waitFor(() => expect(MockWorker.instances).toHaveLength(1));
+    const canvas = canvases[0];
+    const worker = MockWorker.instances[0];
+    const message = worker.receivedMessages[0] as {
+      width: number;
+      height: number;
+      pixels: ArrayBuffer;
+    };
+
+    expect(canvas).toMatchObject({ width: 0, height: 0 });
+    expect(canvas.getContext).toHaveBeenCalledWith('2d', { willReadFrequently: true });
+    expect(canvas.context.drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 2048, 2048);
+    expect(canvas.context.getImageData).toHaveBeenCalledWith(0, 0, 2048, 2048);
+    expect(message).toMatchObject({ width: 2048, height: 2048 });
+    expect(message.pixels.byteLength).toBe(2048 * 2048 * 4);
   });
 
   it('structured-clones transferred pixels, detaches the sender, and preserves receiver bytes', async () => {
