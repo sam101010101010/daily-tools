@@ -12,6 +12,7 @@ import { whoisMeta } from '../tools/whois/meta';
 import { cronMeta } from '../tools/cron/meta';
 import { idGeneratorMeta } from '../tools/id-generator/meta';
 import { ipCidrMeta } from '../tools/ip-cidr/meta';
+import { qrMeta } from '../tools/qr/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -27,6 +28,7 @@ export const tools: ToolMeta[] = [
   cronMeta,
   idGeneratorMeta,
   ipCidrMeta,
+  qrMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {
