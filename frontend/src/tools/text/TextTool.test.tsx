@@ -3,7 +3,17 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import TextTool, { DEFAULT_TEXT_INPUT } from './TextTool';
 
-afterEach(() => vi.unstubAllGlobals());
+const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  if (originalClipboardDescriptor) {
+    Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+  } else {
+    Reflect.deleteProperty(navigator, 'clipboard');
+  }
+});
 
 function stats(prefix: '原始' | '结果') {
   return {
