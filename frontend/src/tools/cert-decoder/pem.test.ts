@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { MAX_DER_BYTES, parseSinglePem } from './pem';
 
 function base64(bytes: Uint8Array): string {
@@ -35,22 +35,41 @@ test('accepts exactly one MiB of DER data', () => {
 });
 
 test.each([
-  ['empty input', ''],
-  ['malformed base64', '-----BEGIN CERTIFICATE-----\n%%%\n-----END CERTIFICATE-----'],
-  ['non-canonical base64', '-----BEGIN CERTIFICATE-----\nAB==\n-----END CERTIFICATE-----'],
-  ['mismatched boundaries', '-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE REQUEST-----'],
-  ['two PEM blocks', `${pem('CERTIFICATE', Uint8Array.of(0))}\n${pem('CERTIFICATE REQUEST', Uint8Array.of(0))}`],
-  ['text before PEM', `not a PEM\n${pem('CERTIFICATE', Uint8Array.of(0))}`],
-  ['text after PEM', `${pem('CERTIFICATE', Uint8Array.of(0))}\nnot a PEM`],
-  ['private key', pem('PRIVATE KEY', Uint8Array.of(0))],
-  ['unknown label', pem('PKCS7', Uint8Array.of(0))],
-])('rejects %s with a stable PEM error', (_description, input) => {
-  expect(parseSinglePem(input)).toMatchObject({ ok: false, error: { code: 'INVALID_PEM' } });
+  ['empty input', '', '提供的内容必须是一个完整的 PEM 块。'],
+  ['malformed base64', '-----BEGIN CERTIFICATE-----\n%%%\n-----END CERTIFICATE-----', 'PEM 内容不是规范的 Base64 编码。'],
+  ['non-canonical base64', '-----BEGIN CERTIFICATE-----\nAB==\n-----END CERTIFICATE-----', 'PEM 内容不是规范的 Base64 编码。'],
+  ['mismatched boundaries', '-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE REQUEST-----', 'PEM 的开始和结束标签必须匹配。'],
+  ['two PEM blocks', `${pem('CERTIFICATE', Uint8Array.of(0))}\n${pem('CERTIFICATE REQUEST', Uint8Array.of(0))}`, 'PEM 的开始和结束标签必须匹配。'],
+  ['text before PEM', `not a PEM\n${pem('CERTIFICATE', Uint8Array.of(0))}`, '提供的内容必须是一个完整的 PEM 块。'],
+  ['text after PEM', `${pem('CERTIFICATE', Uint8Array.of(0))}\nnot a PEM`, '提供的内容必须是一个完整的 PEM 块。'],
+  ['private key', pem('PRIVATE KEY', Uint8Array.of(0)), '不支持该 PEM 标签。'],
+  ['unknown label', pem('PKCS7', Uint8Array.of(0)), '不支持该 PEM 标签。'],
+])('rejects %s with a stable PEM error', (_description, input, message) => {
+  expect(parseSinglePem(input)).toEqual({
+    ok: false,
+    error: {
+      code: 'INVALID_PEM',
+      message,
+    },
+  });
 });
 
 test('rejects a DER payload larger than one MiB', () => {
-  expect(parseSinglePem(pem('CERTIFICATE', new Uint8Array(MAX_DER_BYTES + 1)))).toMatchObject({
+  expect(parseSinglePem(pem('CERTIFICATE', new Uint8Array(MAX_DER_BYTES + 1)))).toEqual({
     ok: false,
-    error: { code: 'INVALID_PEM' },
+    error: { code: 'INVALID_PEM', message: 'PEM 解码后的内容超过 1 MiB 限制。' },
   });
+});
+
+test('rejects an oversized Base64 payload before invoking the decoder', () => {
+  const atobSpy = vi.spyOn(globalThis, 'atob');
+  const encodedBytes = Math.ceil(MAX_DER_BYTES / 3) * 4;
+  const input = `-----BEGIN CERTIFICATE-----\n${'A'.repeat(encodedBytes + 4)}\n-----END CERTIFICATE-----`;
+
+  expect(parseSinglePem(input)).toEqual({
+    ok: false,
+    error: { code: 'INVALID_PEM', message: 'PEM 解码后的内容超过 1 MiB 限制。' },
+  });
+  expect(atobSpy.mock.calls).toHaveLength(0);
+  atobSpy.mockRestore();
 });

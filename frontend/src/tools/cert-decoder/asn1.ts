@@ -5,6 +5,7 @@ import type { PemLabel } from './pem';
 export const MAX_ASN1_DEPTH = 100;
 export const MAX_ASN1_NODES = 10_000;
 export const MAX_ASN1_CONTENT_LENGTH = 1_048_576;
+const DEPTH_LIMIT_MESSAGE = 'ASN.1 嵌套层级超过 100，无法安全处理。';
 
 type PkiObject = Certificate | CertificationRequest;
 
@@ -12,11 +13,11 @@ export type Asn1ParseResult =
   | Readonly<{ ok: true; value: PkiObject }>
   | Readonly<{ ok: false; error: Readonly<{ code: 'INVALID_ASN1'; message: string }> }>;
 
-function invalidAsn1(): Asn1ParseResult {
-  return { ok: false, error: { code: 'INVALID_ASN1', message: '内容不是受支持的有效 ASN.1 证书或证书请求。' } };
+function invalidAsn1(message = '内容不是受支持的有效 ASN.1 证书或证书请求。'): Asn1ParseResult {
+  return { ok: false, error: { code: 'INVALID_ASN1', message } };
 }
 
-type ScanState = { nodes: number };
+type ScanState = { nodes: number; depthLimitReached: boolean };
 
 function readLength(bytes: Uint8Array, offset: number): { length: number; offset: number } | undefined {
   if (offset >= bytes.length) return undefined;
@@ -34,7 +35,11 @@ function readLength(bytes: Uint8Array, offset: number): { length: number; offset
 }
 
 function scanElement(bytes: Uint8Array, start: number, end: number, depth: number, state: ScanState): number | undefined {
-  if (depth > MAX_ASN1_DEPTH || start >= end || state.nodes >= MAX_ASN1_NODES) return undefined;
+  if (depth >= MAX_ASN1_DEPTH) {
+    state.depthLimitReached = true;
+    return undefined;
+  }
+  if (start >= end || state.nodes >= MAX_ASN1_NODES) return undefined;
   state.nodes += 1;
 
   let offset = start;
@@ -61,13 +66,17 @@ function scanElement(bytes: Uint8Array, start: number, end: number, depth: numbe
   return childOffset === contentEnd ? contentEnd : undefined;
 }
 
-function hasAllowedStructure(bytes: Uint8Array): boolean {
-  if (bytes.byteLength === 0 || bytes.byteLength > MAX_ASN1_CONTENT_LENGTH) return false;
-  return scanElement(bytes, 0, bytes.length, 0, { nodes: 0 }) === bytes.length;
+function structureIssue(bytes: Uint8Array): 'depth' | 'invalid' | undefined {
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_ASN1_CONTENT_LENGTH) return 'invalid';
+  const state: ScanState = { nodes: 0, depthLimitReached: false };
+  if (scanElement(bytes, 0, bytes.length, 0, state) === bytes.length) return undefined;
+  return state.depthLimitReached ? 'depth' : 'invalid';
 }
 
 export function parsePkiDer(der: Uint8Array, label: PemLabel): Asn1ParseResult {
-  if (!hasAllowedStructure(der)) return invalidAsn1();
+  const issue = structureIssue(der);
+  if (issue === 'depth') return invalidAsn1(DEPTH_LIMIT_MESSAGE);
+  if (issue) return invalidAsn1();
 
   let schema: asn1js.BaseBlock;
   try {

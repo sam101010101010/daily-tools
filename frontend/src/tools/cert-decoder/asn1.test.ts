@@ -26,10 +26,18 @@ function deeplyNestedSequence(depth: number): Uint8Array {
   return result;
 }
 
-function expectInvalidAsn1(der: Uint8Array): void {
+function expectInvalidAsn1(
+  der: Uint8Array,
+  message = '内容不是受支持的有效 ASN.1 证书或证书请求。',
+): void {
   const result = parsePkiDer(der, 'CERTIFICATE');
-  expect(result).toMatchObject({ ok: false, error: { code: 'INVALID_ASN1' } });
-  if (!result.ok) expect(result.error.message).not.toContain('0x');
+  expect(result).toEqual({
+    ok: false,
+    error: {
+      code: 'INVALID_ASN1',
+      message,
+    },
+  });
 }
 
 test('constructs only a PKI.js Certificate for a complete certificate DER', () => {
@@ -51,10 +59,10 @@ test.each([
 
 test.each([
   ['truncated long-form length', Uint8Array.of(0x30, 0x82, 0x01)],
-  ['depth over 100', deeplyNestedSequence(101)],
+  ['depth over 100', deeplyNestedSequence(100), 'ASN.1 嵌套层级超过 100，无法安全处理。'],
   ['more than 10,000 ASN.1 nodes', sequence(new Uint8Array(20_002).fill(0).map((_, index) => index % 2 === 0 ? 0x05 : 0x00))],
   ['content over one MiB', Uint8Array.from([0x04, ...length(1_048_577), ...new Uint8Array(1_048_577)])],
   ['random bytes', Uint8Array.of(0x97, 0x4c, 0x23, 0xff, 0x00, 0xc1)],
-])('rejects %s without exposing parser details', (_description, der) => {
-  expectInvalidAsn1(der);
+])('rejects %s without exposing parser details', (_description, der, message?: string) => {
+  expectInvalidAsn1(der, message);
 });

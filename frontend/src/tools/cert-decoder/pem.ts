@@ -1,4 +1,6 @@
 export const MAX_DER_BYTES = 1_048_576;
+const MAX_BASE64_CHARS = Math.ceil(MAX_DER_BYTES / 3) * 4;
+const MAX_PEM_TEXT_CHARS = MAX_BASE64_CHARS * 2;
 
 const ALLOWED_LABELS = [
   'CERTIFICATE',
@@ -40,14 +42,27 @@ function decodeCanonicalBase64(value: string): Uint8Array | undefined {
   }
 }
 
+function exceedsBase64Limit(value: string): boolean {
+  let base64Chars = 0;
+  for (const character of value) {
+    if (/\s/.test(character)) continue;
+    base64Chars += 1;
+    if (base64Chars > MAX_BASE64_CHARS) return true;
+  }
+  return false;
+}
+
 export function parseSinglePem(input: string): PemParseResult {
+  if (input.length > MAX_PEM_TEXT_CHARS) return invalidPem('PEM 文本超过安全大小限制。');
+
   const value = input.trim();
-  const match = /^-----BEGIN ([A-Z ]+)-----\r?\n([\s\S]*?)\r?\n-----END ([A-Z ]+)-----$/.exec(value);
+  const match = /^-----BEGIN ([A-Z0-9 ]+)-----\r?\n([\s\S]*?)\r?\n-----END ([A-Z0-9 ]+)-----$/.exec(value);
   if (!match) return invalidPem('提供的内容必须是一个完整的 PEM 块。');
 
   const [, beginLabel, wrappedBase64, endLabel] = match;
   if (beginLabel !== endLabel) return invalidPem('PEM 的开始和结束标签必须匹配。');
   if (!ALLOWED_LABELS.includes(beginLabel as PemLabel)) return invalidPem('不支持该 PEM 标签。');
+  if (exceedsBase64Limit(wrappedBase64)) return invalidPem('PEM 解码后的内容超过 1 MiB 限制。');
 
   const der = decodeCanonicalBase64(wrappedBase64.replace(/\s/g, ''));
   if (!der) return invalidPem('PEM 内容不是规范的 Base64 编码。');
