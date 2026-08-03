@@ -227,3 +227,26 @@ test('QR tool is one local registry entry searchable by generation and image-rec
   }
   await expect(qr[0].load()).resolves.toHaveProperty('default');
 });
+
+test('text processor is a unique browser-only registry entry with fixed operations and distinct discovery terms', async () => {
+  const text = registry.filter(t => t.id === 'text');
+
+  expect(text).toHaveLength(1);
+  expect(new Set(registry.map(t => t.id)).size).toBe(registry.length);
+  expect(text[0]).toMatchObject({
+    id: 'text',
+    name: '文本处理器',
+    description: '在浏览器本地执行大小写、空白和逐行操作，并对比 Unicode / UTF-8 统计',
+    category: '文本',
+    keywords: ['text', '文本', '大小写', '空白', '排序', '去重', '统计', '行'],
+  });
+  expect(text[0]).not.toHaveProperty('backend');
+  expect(text[0]).not.toHaveProperty('icon');
+  expect(searchTools(registry, 'text').map(t => t.id)).toEqual(['text']);
+  expect(searchTools(registry, '大小写').map(t => t.id)).toEqual(['text']);
+  expect(searchTools(registry, '正则').map(t => t.id)).toContain('regexp');
+  expect(searchTools(registry, '正则').map(t => t.id)).not.toContain('text');
+  expect(searchTools(registry, 'json').map(t => t.id)).toContain('json');
+  expect(searchTools(registry, 'json').map(t => t.id)).not.toContain('text');
+  await expect(text[0].load()).resolves.toHaveProperty('default');
+});

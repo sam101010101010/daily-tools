@@ -42,7 +42,7 @@ function TextStats({ prefix, input }: StatsProps) {
   const stats = calculateTextStats(input);
 
   return (
-    <dl>
+    <dl className="text-tool__stats">
       <div><dt>{prefix}字符数</dt><dd aria-label={`${prefix}字符数`}>{stats.characters}</dd></div>
       <div><dt>{prefix}词数</dt><dd aria-label={`${prefix}词数`}>{stats.words}</dd></div>
       <div><dt>{prefix}行数</dt><dd aria-label={`${prefix}行数`}>{stats.lines}</dd></div>
@@ -90,23 +90,25 @@ export default function TextTool() {
   return (
     <section className="text-tool" aria-label="文本处理">
       <form onSubmit={(event) => { event.preventDefault(); processText(); }}>
-        <label htmlFor="text-operation">处理操作</label>
-        <select
-          id="text-operation"
-          value={operation}
-          onChange={(event) => setOperation(event.target.value as TextOperation)}
-        >
-          {operationGroups.map((group) => (
-            <optgroup key={group.label} label={group.label}>
-              {group.operations.map((candidate) => (
-                <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <div className="text-tool__operation">
+          <label htmlFor="text-operation">处理操作</label>
+          <select
+            id="text-operation"
+            value={operation}
+            onChange={(event) => setOperation(event.target.value as TextOperation)}
+          >
+            {operationGroups.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.operations.map((candidate) => (
+                  <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
 
         <div className="text-tool__columns">
-          <div>
+          <div className="text-tool__pane">
             <label htmlFor="text-input">原始文本</label>
             <textarea
               id="text-input"
@@ -121,7 +123,7 @@ export default function TextTool() {
             />
             <TextStats prefix="原始" input={input} />
           </div>
-          <div>
+          <div className="text-tool__pane">
             <label htmlFor="text-result">处理结果</label>
             <textarea id="text-result" value={result} readOnly />
             <TextStats prefix="结果" input={result} />
