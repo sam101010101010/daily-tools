@@ -72,6 +72,28 @@ test.each([
   expect(screen.getByRole('status')).toHaveTextContent('处理完成');
 });
 
+test('keeps the last processed result and its statistics until processing is explicitly requested again', async () => {
+  const user = userEvent.setup();
+  render(<TextTool />);
+
+  await replaceInput(user, ' a ');
+  await user.click(screen.getByRole('button', { name: '处理' }));
+  expect(screen.getByRole('textbox', { name: '处理结果' })).toHaveValue(' A ');
+  expect(stats('结果').characters).toHaveTextContent('3');
+  expect(stats('结果').words).toHaveTextContent('1');
+  expect(stats('结果').lines).toHaveTextContent('1');
+  expect(stats('结果').bytes).toHaveTextContent('3');
+
+  await replaceInput(user, 'different source');
+  await user.selectOptions(screen.getByRole('combobox', { name: '处理操作' }), 'lowercase');
+
+  expect(screen.getByRole('textbox', { name: '处理结果' })).toHaveValue(' A ');
+  expect(stats('结果').characters).toHaveTextContent('3');
+  expect(stats('结果').words).toHaveTextContent('1');
+  expect(stats('结果').lines).toHaveTextContent('1');
+  expect(stats('结果').bytes).toHaveTextContent('3');
+});
+
 test('processes empty and CRLF input deterministically while retaining or removing a trailing newline by operation semantics', async () => {
   const user = userEvent.setup();
   render(<TextTool />);
