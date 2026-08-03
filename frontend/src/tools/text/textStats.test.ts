@@ -7,6 +7,7 @@ test.each([
   ['CRLF, CR and LF line endings', 'a\r\nb\rc\nd', { characters: 8, words: 4, lines: 4, bytes: 8 }],
   ['a trailing newline', 'a\n', { characters: 2, words: 1, lines: 2, bytes: 2 }],
   ['tab-separated words', 'a\tb\t', { characters: 4, words: 2, lines: 1, bytes: 4 }],
+  ['NEL-separated words', 'a\u0085b', { characters: 3, words: 2, lines: 1, bytes: 4 }],
   ['CJK text', '你好 世界', { characters: 5, words: 2, lines: 1, bytes: 13 }],
   ['a combining mark as a separate code point', 'e\u0301', { characters: 2, words: 1, lines: 1, bytes: 3 }],
   ['an emoji code point', '😀', { characters: 1, words: 1, lines: 1, bytes: 4 }],

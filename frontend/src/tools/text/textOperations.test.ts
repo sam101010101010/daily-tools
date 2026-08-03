@@ -31,6 +31,10 @@ test('line operations preserve a trailing newline unless their own semantics rem
   expect(applyTextOperation({ operation: 'dedupe-lines', input: 'a\na\n' }).output).toBe('a\n');
 });
 
+test('ascending sort compares Unicode code points rather than UTF-16 code units', () => {
+  expect(applyTextOperation({ operation: 'sort-ascending', input: '😀\n\uE000' }).output).toBe('\uE000\n😀');
+});
+
 test('dedupe preserves the first exact occurrence, including empty lines and case differences', () => {
   expect(applyTextOperation({ operation: 'dedupe-lines', input: '\n\na\nA\na\n' }).output).toBe('\na\nA');
 });
