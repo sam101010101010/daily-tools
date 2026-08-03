@@ -52,4 +52,16 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/\.cron__field-legend\s*\{[^}]*repeat\(auto-fit, minmax\(8rem, 1fr\)\)/);
     expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.cron__profile-selector\s*\{[\s\S]*width:\s*100%/);
   });
+
+  it('gives the text processor token-scoped controls, equal panes, compact statistics, and a 390px stack', () => {
+    expect(css).toMatch(/\.text-tool__operation\s*\{[^}]*display:\s*flex[^}]*var\(--text-muted\)/);
+    expect(css).toMatch(/\.text-tool__columns\s*\{[^}]*display:\s*grid[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.text-tool__pane\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/);
+    expect(css).toMatch(/\.text-tool__pane textarea\s*\{[^}]*height:\s*16rem[^}]*min-height:\s*16rem[^}]*max-height:\s*16rem[^}]*white-space:\s*pre-wrap/);
+    expect(css).toMatch(/\.text-tool__stats\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.text-tool__stats > div\s*\{[^}]*var\(--border\)/);
+    expect(css).toMatch(/\.text-tool\s+:is\(select, textarea\):focus-visible\s*\{[^}]*var\(--accent\)/);
+    expect(css).toMatch(/\.text-tool__actions\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.text-tool__columns\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+  });
 });
