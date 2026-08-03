@@ -14,3 +14,18 @@ test.each([
 ] as const)('calculateTextStats reports exact ADR-0023 statistics for %s', (_name, input, expected) => {
   expect(calculateTextStats(input)).toEqual(expected);
 });
+
+test.each([
+  '',
+  'ASCII only',
+  'e\u0301',
+  '你好 世界',
+  '😀🚀',
+  'A\u00a0B\u3000C',
+  'mixed 😀 text\n第二行',
+])('UTF-8 byte count is at least the Unicode code-point count for the valid sample %j', (input) => {
+  const stats = calculateTextStats(input);
+
+  expect(stats.characters).toBe(Array.from(input).length);
+  expect(stats.bytes).toBeGreaterThanOrEqual(stats.characters);
+});

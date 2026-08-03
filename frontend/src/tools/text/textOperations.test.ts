@@ -5,6 +5,20 @@ test('normalizeNewlines converts CRLF and CR to LF', () => {
   expect(normalizeNewlines('first\r\nsecond\rthird\nfourth')).toBe('first\nsecond\nthird\nfourth');
 });
 
+test.each([
+  '',
+  'plain\nLF',
+  'three\n\n\nLF',
+  'CRLF\r\nline',
+  'CR\rline',
+  'mixed\r\nline\rline\nline',
+  '😀\r\n你好\r\ne\u0301',
+])('normalizeNewlines is idempotent for the deterministic sample %j', (input) => {
+  const normalized = normalizeNewlines(input);
+
+  expect(normalizeNewlines(normalized)).toBe(normalized);
+});
+
 test.each<[TextOperation, string, string]>([
   ['uppercase', 'a\r\nb!', 'A\nB!'],
   ['lowercase', 'A\rB!', 'a\nb!'],
@@ -39,6 +53,35 @@ test('dedupe preserves the first exact occurrence, including empty lines and cas
   expect(applyTextOperation({ operation: 'dedupe-lines', input: '\n\na\nA\na\n' }).output).toBe('\na\nA');
 });
 
+test.each([
+  '',
+  'one',
+  'a\na\nb\na',
+  '\n\na\n\nA\na\n',
+  '😀\n你好\n😀\ne\u0301\n你好',
+  'a\r\na\rb\na',
+])('dedupe-lines is idempotent for the deterministic sample %j', (input) => {
+  const once = applyTextOperation({ operation: 'dedupe-lines', input }).output;
+
+  expect(applyTextOperation({ operation: 'dedupe-lines', input: once }).output).toBe(once);
+});
+
+test.each([
+  '',
+  'single',
+  'z\na\nm\na',
+  '😀\n\uE000\na\nA',
+  'b\r\na\r😀\na',
+  '\nthird\nfirst\nsecond',
+])('sort-ascending produces a monotonic sequence for the deterministic sample %j', (input) => {
+  const output = applyTextOperation({ operation: 'sort-ascending', input }).output;
+  const lines = output.split('\n');
+
+  for (let index = 1; index < lines.length; index += 1) {
+    expect(compareCodePointStrings(lines[index - 1], lines[index])).toBeLessThanOrEqual(0);
+  }
+});
+
 test('applyTextOperation returns statistics for its output without mutating its input request', () => {
   const request = { operation: 'sort-ascending' as const, input: '😀\na\n😀' };
   const snapshot = { ...request };
@@ -49,3 +92,16 @@ test('applyTextOperation returns statistics for its output without mutating its 
   });
   expect(request).toEqual(snapshot);
 });
+
+function compareCodePointStrings(left: string, right: string): number {
+  const leftPoints = Array.from(left);
+  const rightPoints = Array.from(right);
+  const length = Math.min(leftPoints.length, rightPoints.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const difference = leftPoints[index].codePointAt(0)! - rightPoints[index].codePointAt(0)!;
+    if (difference !== 0) return difference;
+  }
+
+  return leftPoints.length - rightPoints.length;
+}
