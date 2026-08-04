@@ -31,7 +31,11 @@ test('accepts exactly one MiB of DER data', () => {
 
   const result = parseSinglePem(pem('CERTIFICATE', der));
 
-  expect(result).toEqual({ ok: true, value: { label: 'CERTIFICATE', der } });
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error('Expected the boundary PEM to parse.');
+  expect(result.value.label).toBe('CERTIFICATE');
+  expect(result.value.der).toHaveLength(MAX_DER_BYTES);
+  expect(result.value.der.every(byte => byte === 0x5a)).toBe(true);
 });
 
 test.each([
