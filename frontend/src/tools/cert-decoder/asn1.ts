@@ -80,7 +80,11 @@ export function parsePkiDer(der: Uint8Array, label: PemLabel): Asn1ParseResult {
 
   let schema: asn1js.BaseBlock;
   try {
-    const decoded = asn1js.fromBER(new Uint8Array(der).buffer);
+    const decoded = asn1js.fromBER(new Uint8Array(der).buffer, {
+      maxDepth: MAX_ASN1_DEPTH,
+      maxNodes: MAX_ASN1_NODES,
+      maxContentLength: MAX_ASN1_CONTENT_LENGTH,
+    });
     if (decoded.offset !== der.byteLength) return invalidAsn1();
     schema = decoded.result;
   } catch {
