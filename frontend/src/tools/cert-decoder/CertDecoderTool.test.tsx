@@ -77,6 +77,26 @@ test('prefills a public certificate but waits for explicit decode without networ
   expect(writeText).not.toHaveBeenCalled();
 });
 
+test('exposes scoped layout hooks and contains report tables for responsive styling', async () => {
+  // Catches removing the component boundary or the wrappers that keep wide
+  // identity/report data from causing page-level horizontal overflow.
+  const { container } = render(<CertDecoderTool />);
+
+  expect(container.firstElementChild).toHaveClass('cert-decoder');
+  expect(screen.getByLabelText('处理与验证范围说明')).toHaveClass('cert-decoder__notice');
+  expect(screen.getByLabelText('PEM 证书或 CSR')).toHaveClass('cert-decoder__editor');
+  expect(screen.getByRole('button', { name: '解码' }).parentElement).toHaveClass('cert-decoder__decode-actions');
+
+  const report = await decodeAs(rsaCertificatePem, '证书报告');
+
+  expect(report).toHaveClass('cert-decoder__report', 'cert-decoder__report--certificate');
+  expect(report.querySelector(':scope > dl')).toHaveClass('cert-decoder__summary');
+  expect(screen.getByRole('button', { name: '复制完整报告' }).parentElement).toHaveClass('cert-decoder__report-actions');
+  for (const table of within(report).getAllByRole('table')) {
+    expect(table.parentElement).toHaveClass('cert-decoder__table-wrap');
+  }
+});
+
 test('renders a semantic RSA certificate report with ordered identity, SAN, validity, extensions and algorithms', async () => {
   // Catches selecting the CSR branch, losing DN order, hiding OIDs/SANs, or
   // presenting the controlled-clock validity state as broader trust.

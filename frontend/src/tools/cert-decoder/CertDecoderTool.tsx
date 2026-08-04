@@ -60,7 +60,7 @@ const SAN_TYPE_LABELS: Readonly<Record<SubjectAlternativeName['type'], string>> 
 };
 
 function AlgorithmValue({ algorithm }: { algorithm: AlgorithmReport }) {
-  return <>{algorithm.name}（{algorithm.oid}）</>;
+  return <>{algorithm.name}（<span className="cert-decoder__mono">{algorithm.oid}</span>）</>;
 }
 
 function DistinguishedNameTable({
@@ -71,91 +71,97 @@ function DistinguishedNameTable({
   values: readonly DistinguishedNameItem[];
 }) {
   return (
-    <table aria-label={label}>
-      <thead><tr><th scope="col">属性</th><th scope="col">OID</th><th scope="col">值</th></tr></thead>
-      <tbody>
-        {values.map((item, index) => (
-          <tr key={`${item.oid}-${index}`}>
-            <td>{item.name}</td><td>{item.oid}</td><td>{item.value}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="cert-decoder__table-wrap" role="region" aria-label={`${label} 表格滚动区域`} tabIndex={0}>
+      <table className="cert-decoder__table cert-decoder__table--dn" aria-label={label}>
+        <thead><tr><th scope="col">属性</th><th scope="col">OID</th><th scope="col">值</th></tr></thead>
+        <tbody>
+          {values.map((item, index) => (
+            <tr key={`${item.oid}-${index}`}>
+              <td>{item.name}</td><td className="cert-decoder__mono">{item.oid}</td><td>{item.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 function SanTable({ label, values }: { label: string; values: readonly SubjectAlternativeName[] }) {
   return (
-    <table aria-label={label}>
-      <thead><tr><th scope="col">类型</th><th scope="col">值</th></tr></thead>
-      <tbody>
-        {values.map((item, index) => (
-          <tr key={`${item.type}-${index}`}>
-            <td>{SAN_TYPE_LABELS[item.type]}{item.type === 'unknown' ? `（tag ${item.tag}）` : ''}</td>
-            <td>{item.value}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="cert-decoder__table-wrap" role="region" aria-label={`${label} 表格滚动区域`} tabIndex={0}>
+      <table className="cert-decoder__table cert-decoder__table--san" aria-label={label}>
+        <thead><tr><th scope="col">类型</th><th scope="col">值</th></tr></thead>
+        <tbody>
+          {values.map((item, index) => (
+            <tr key={`${item.type}-${index}`}>
+              <td>{SAN_TYPE_LABELS[item.type]}{item.type === 'unknown' ? `（tag ${item.tag}）` : ''}</td>
+              <td className="cert-decoder__mono">{item.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 function Fingerprint({ value }: { value: string }) {
-  return <code>{value}</code>;
+  return <code className="cert-decoder__mono">{value}</code>;
 }
 
 function CertificateExtensions({ report }: { report: CertificateReport }) {
   const { basicConstraints, keyUsage, extendedKeyUsage, unrecognized } = report.extensions;
   return (
-    <details open>
+    <details className="cert-decoder__extensions" open>
       <summary>证书扩展</summary>
-      <dl>
-        <div>
+      <dl className="cert-decoder__extension-list">
+        <div className="cert-decoder__field">
           <dt>Basic Constraints</dt>
-          <dd>{basicConstraints
+          <dd className="cert-decoder__extension-value">{basicConstraints
             ? `${basicConstraints.oid}；critical：${basicConstraints.critical ? '是' : '否'}；CA：${basicConstraints.ca ? '是' : '否'}；路径长度：${basicConstraints.pathLength ?? '未限制'}`
             : '未包含'}</dd>
         </div>
-        <div>
+        <div className="cert-decoder__field">
           <dt>Key Usage</dt>
-          <dd>{keyUsage
+          <dd className="cert-decoder__extension-value">{keyUsage
             ? `${keyUsage.oid}；critical：${keyUsage.critical ? '是' : '否'}；${keyUsage.usages.join('、') || '无已知用途'}`
             : '未包含'}</dd>
         </div>
-        <div>
+        <div className="cert-decoder__field">
           <dt>Extended Key Usage</dt>
-          <dd>{extendedKeyUsage
+          <dd className="cert-decoder__extension-value">{extendedKeyUsage
             ? `${extendedKeyUsage.oid}；critical：${extendedKeyUsage.critical ? '是' : '否'}；${extendedKeyUsage.purposes.map(purpose => `${purpose.name}（${purpose.oid}）`).join('、') || '无已知用途'}`
             : '未包含'}</dd>
         </div>
       </dl>
       {unrecognized.length > 0 ? (
-        <table aria-label="未识别的证书扩展">
-          <thead><tr><th scope="col">OID</th><th scope="col">Critical</th><th scope="col">值</th></tr></thead>
-          <tbody>{unrecognized.map((extension, index) => (
-            <tr key={`${extension.oid}-${index}`}>
-              <td>{extension.oid}</td><td>{extension.critical ? '是' : '否'}</td><td>{extension.value}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      ) : <p>没有未识别的扩展。</p>}
+        <div className="cert-decoder__table-wrap" role="region" aria-label="未识别的证书扩展 表格滚动区域" tabIndex={0}>
+          <table className="cert-decoder__table cert-decoder__table--extensions" aria-label="未识别的证书扩展">
+            <thead><tr><th scope="col">OID</th><th scope="col">Critical</th><th scope="col">值</th></tr></thead>
+            <tbody>{unrecognized.map((extension, index) => (
+              <tr key={`${extension.oid}-${index}`}>
+                <td className="cert-decoder__mono">{extension.oid}</td><td>{extension.critical ? '是' : '否'}</td><td className="cert-decoder__extension-value">{extension.value}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : <p className="cert-decoder__empty">没有未识别的扩展。</p>}
     </details>
   );
 }
 
 function CertificateReportView({ report }: { report: CertificateReport }) {
   return (
-    <section role="region" aria-label="证书报告">
+    <section className="cert-decoder__report cert-decoder__report--certificate" role="region" aria-label="证书报告">
       <h3>证书报告</h3>
-      <dl>
-        <div><dt>版本</dt><dd>{report.version}</dd></div>
-        <div><dt>序列号</dt><dd><code>{report.serialNumber}</code></dd></div>
-        <div><dt>生效时间</dt><dd><time dateTime={report.validity.notBefore}>{report.validity.notBefore}</time></dd></div>
-        <div><dt>到期时间</dt><dd><time dateTime={report.validity.notAfter}>{report.validity.notAfter}</time></dd></div>
-        <div><dt>日期状态</dt><dd>{VALIDITY_LABELS[report.validity.state]}</dd></div>
-        <div><dt>公钥算法</dt><dd><AlgorithmValue algorithm={report.publicKeyAlgorithm} /></dd></div>
-        <div><dt>签名算法</dt><dd><AlgorithmValue algorithm={report.signatureAlgorithm} /></dd></div>
-        <div><dt>SHA-256 指纹</dt><dd><Fingerprint value={report.fingerprintSha256} /></dd></div>
+      <dl className="cert-decoder__summary">
+        <div className="cert-decoder__field"><dt>版本</dt><dd>{report.version}</dd></div>
+        <div className="cert-decoder__field"><dt>序列号</dt><dd><code className="cert-decoder__mono">{report.serialNumber}</code></dd></div>
+        <div className="cert-decoder__field"><dt>生效时间</dt><dd><time dateTime={report.validity.notBefore}>{report.validity.notBefore}</time></dd></div>
+        <div className="cert-decoder__field"><dt>到期时间</dt><dd><time dateTime={report.validity.notAfter}>{report.validity.notAfter}</time></dd></div>
+        <div className="cert-decoder__field"><dt>日期状态</dt><dd>{VALIDITY_LABELS[report.validity.state]}</dd></div>
+        <div className="cert-decoder__field"><dt>公钥算法</dt><dd><AlgorithmValue algorithm={report.publicKeyAlgorithm} /></dd></div>
+        <div className="cert-decoder__field"><dt>签名算法</dt><dd><AlgorithmValue algorithm={report.signatureAlgorithm} /></dd></div>
+        <div className="cert-decoder__field"><dt>SHA-256 指纹</dt><dd><Fingerprint value={report.fingerprintSha256} /></dd></div>
       </dl>
       <h4>主题</h4>
       <DistinguishedNameTable label="主题 DN" values={report.subject} />
@@ -164,7 +170,7 @@ function CertificateReportView({ report }: { report: CertificateReport }) {
       <h4>主题备用名称</h4>
       {report.subjectAlternativeNames.length > 0
         ? <SanTable label="主题备用名称" values={report.subjectAlternativeNames} />
-        : <p>未包含</p>}
+        : <p className="cert-decoder__empty">未包含</p>}
       <CertificateExtensions report={report} />
     </section>
   );
@@ -178,20 +184,20 @@ function csrSignatureLabel(report: CertificationRequestReport): string {
 
 function CertificationRequestReportView({ report }: { report: CertificationRequestReport }) {
   return (
-    <section role="region" aria-label="CSR 报告">
+    <section className="cert-decoder__report cert-decoder__report--csr" role="region" aria-label="CSR 报告">
       <h3>CSR 报告</h3>
-      <dl>
-        <div><dt>公钥算法</dt><dd><AlgorithmValue algorithm={report.publicKeyAlgorithm} /></dd></div>
-        <div><dt>签名算法</dt><dd><AlgorithmValue algorithm={report.signatureAlgorithm} /></dd></div>
-        <div><dt>SHA-256 指纹</dt><dd><Fingerprint value={report.fingerprintSha256} /></dd></div>
-        <div><dt>CSR 签名状态</dt><dd>{csrSignatureLabel(report)}</dd></div>
+      <dl className="cert-decoder__summary">
+        <div className="cert-decoder__field"><dt>公钥算法</dt><dd><AlgorithmValue algorithm={report.publicKeyAlgorithm} /></dd></div>
+        <div className="cert-decoder__field"><dt>签名算法</dt><dd><AlgorithmValue algorithm={report.signatureAlgorithm} /></dd></div>
+        <div className="cert-decoder__field"><dt>SHA-256 指纹</dt><dd><Fingerprint value={report.fingerprintSha256} /></dd></div>
+        <div className="cert-decoder__field"><dt>CSR 签名状态</dt><dd>{csrSignatureLabel(report)}</dd></div>
       </dl>
       <h4>请求主题</h4>
       <DistinguishedNameTable label="请求主题 DN" values={report.subject} />
       <h4>请求的主题备用名称</h4>
       {report.subjectAlternativeNames.status === 'present'
         ? <SanTable label="请求的主题备用名称" values={report.subjectAlternativeNames.values} />
-        : <dl><div><dt>请求的主题备用名称</dt><dd>{report.subjectAlternativeNames.label}</dd></div></dl>}
+        : <dl className="cert-decoder__summary"><div className="cert-decoder__field"><dt>请求的主题备用名称</dt><dd>{report.subjectAlternativeNames.label}</dd></div></dl>}
     </section>
   );
 }
@@ -204,7 +210,7 @@ function ReportActions({
   onCopy: (value: string, successMessage: string) => void;
 }) {
   return (
-    <div>
+    <div className="cert-decoder__report-actions">
       <button type="button" onClick={() => onCopy(report.fingerprintSha256, 'SHA-256 指纹已复制')}>
         复制 SHA-256 指纹
       </button>
@@ -285,20 +291,21 @@ export default function CertDecoderTool() {
 
   return (
     <div className="cert-decoder">
-      <aside aria-label="处理与验证范围说明">
+      <aside className="cert-decoder__notice" aria-label="处理与验证范围说明">
         <p><strong>所有内容仅在当前浏览器本地处理，不会上传。</strong></p>
         <p>证书解析和日期状态不代表证书链信任、主机名匹配或吊销验证。</p>
         <p>CSR 签名有效仅证明签名时持有请求内公钥对应的私钥，不证明身份、信任或已签发。</p>
       </aside>
-      <label htmlFor="cert-decoder-input">PEM 证书或 CSR</label>
+      <label className="cert-decoder__label" htmlFor="cert-decoder-input">PEM 证书或 CSR</label>
       <textarea
+        className="cert-decoder__editor"
         id="cert-decoder-input"
         value={input}
         onChange={event => setInput(event.target.value)}
         rows={14}
         spellCheck={false}
       />
-      <div>
+      <div className="cert-decoder__decode-actions">
         <button type="button" onClick={() => void decode()}>解码</button>
         <button type="button" onClick={reset}>重置</button>
       </div>
@@ -311,7 +318,7 @@ export default function CertDecoderTool() {
             : <CertificationRequestReportView report={report} />}
         </>
       )}
-      {copyStatus && <p role="status" aria-live="polite">{copyStatus}</p>}
+      {copyStatus && <p className="cert-decoder__status" role="status" aria-live="polite">{copyStatus}</p>}
       {copyError && <ErrorView message={copyError} />}
     </div>
   );

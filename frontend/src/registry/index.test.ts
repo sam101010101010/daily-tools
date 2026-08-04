@@ -250,3 +250,27 @@ test('text processor is a unique browser-only registry entry with fixed operatio
   expect(searchTools(registry, 'json').map(t => t.id)).not.toContain('text');
   await expect(text[0].load()).resolves.toHaveProperty('default');
 });
+
+test('certificate and CSR decoder is a unique browser-local registry tool with complete PKI discovery terms', async () => {
+  // Catches omitting the central entry, weakening its discovery contract,
+  // accidentally adding a backend/icon, or replacing the lazy boundary.
+  const certDecoder = registry.filter(tool => tool.id === 'cert-decoder');
+
+  expect(certDecoder).toHaveLength(1);
+  expect(new Set(registry.map(tool => tool.id)).size).toBe(registry.length);
+  expect(certDecoder[0]).toMatchObject({
+    id: 'cert-decoder',
+    name: '证书 / CSR 解码器',
+    description: '在浏览器本地解析 X.509 证书或 PKCS#10 CSR，并验证 CSR 签名',
+    category: '网络',
+    keywords: ['X.509', 'PEM', 'CSR', 'PKCS10', '证书', '公钥', 'SAN', '指纹'],
+  });
+  expect(certDecoder[0]).not.toHaveProperty('backend');
+  expect(certDecoder[0]).not.toHaveProperty('icon');
+
+  for (const query of ['X.509', 'PEM', 'CSR', 'PKCS10', '证书', '公钥', 'SAN', '指纹']) {
+    expect(searchTools(registry, query).map(tool => tool.id)).toContain('cert-decoder');
+  }
+
+  await expect(certDecoder[0].load()).resolves.toHaveProperty('default');
+});
