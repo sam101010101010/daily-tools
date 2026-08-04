@@ -173,6 +173,14 @@ function bytesToHex(bytes: Uint8Array, separator = ':'): string {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(separator);
 }
 
+function positiveIntegerHex(bytes: Uint8Array): string {
+  let firstValueByte = 0;
+  while (firstValueByte < bytes.length - 1 && bytes[firstValueByte] === 0) {
+    firstValueByte += 1;
+  }
+  return bytesToHex(bytes.subarray(firstValueByte), '');
+}
+
 function asn1TextValue(value: asn1js.BaseBlock): string {
   const valueBlock = value.valueBlock as unknown as { value?: unknown };
   return typeof valueBlock.value === 'string'
@@ -220,10 +228,18 @@ function formatIpAddress(bytes: Uint8Array): string {
 }
 
 function unknownGeneralNameValue(name: GeneralName): string {
-  const value = name.value as unknown as { toBER?: (encodeFlag?: boolean) => ArrayBuffer };
-  return typeof value.toBER === 'function'
-    ? bytesToHex(new Uint8Array(value.toBER(false)))
-    : String(name.value);
+  if (typeof name.value === 'string') return name.value;
+  const value = name.value as unknown as {
+    toBER?: (encodeFlag?: boolean) => ArrayBuffer;
+    toSchema?: () => asn1js.BaseBlock;
+  };
+  if (typeof value.toBER === 'function') {
+    return bytesToHex(new Uint8Array(value.toBER(false)));
+  }
+  if (typeof value.toSchema === 'function') {
+    return bytesToHex(new Uint8Array(value.toSchema().toBER(false)));
+  }
+  return `GeneralName tag ${name.type} value unavailable`;
 }
 
 function mapGeneralName(name: GeneralName): SubjectAlternativeName {
@@ -306,7 +322,7 @@ export async function mapCertificate(
   return {
     kind: 'certificate',
     version: certificate.version + 1,
-    serialNumber: bytesToHex(certificate.serialNumber.valueBlock.valueHexView, ''),
+    serialNumber: positiveIntegerHex(certificate.serialNumber.valueBlock.valueHexView),
     subject: mapDistinguishedName(certificate.subject),
     issuer: mapDistinguishedName(certificate.issuer),
     validity: {

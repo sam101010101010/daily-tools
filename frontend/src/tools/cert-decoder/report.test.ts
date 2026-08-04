@@ -12,6 +12,10 @@ import { mapCertificate } from './report';
 const FIXTURE_DIRECTORY = resolve(process.cwd(), 'src/tools/cert-decoder/fixtures');
 const rsaCertificatePem = readFileSync(resolve(FIXTURE_DIRECTORY, 'rsa-certificate.pem'), 'utf8');
 const ecdsaCertificatePem = readFileSync(resolve(FIXTURE_DIRECTORY, 'ecdsa-certificate.pem'), 'utf8');
+const issuerSignedEdgeCertificatePem = readFileSync(
+  resolve(FIXTURE_DIRECTORY, 'issuer-signed-edge-certificate.pem'),
+  'utf8',
+);
 
 function parseCertificate(pem: string): { certificate: Certificate; der: Uint8Array } {
   const pemResult = parseSinglePem(pem);
@@ -62,7 +66,14 @@ describe('mapCertificate', () => {
       { oid: '1.2.840.113549.1.9.1', name: 'Email Address', value: 'ops@example.test' },
       { oid: '1.2.3.4.5', name: 'unknown', value: 'Research Unit' },
     ]);
-    expect(report.issuer).toEqual(report.subject);
+    expect(report.issuer).toEqual([
+      { oid: '2.5.4.6', name: 'Country', value: 'US' },
+      { oid: '2.5.4.10', name: 'Organization', value: 'Daily Tools Lab' },
+      { oid: '2.5.4.11', name: 'Organizational Unit', value: 'Certificate Fixtures' },
+      { oid: '2.5.4.3', name: 'Common Name', value: 'rsa.example.test' },
+      { oid: '1.2.840.113549.1.9.1', name: 'Email Address', value: 'ops@example.test' },
+      { oid: '1.2.3.4.5', name: 'unknown', value: 'Research Unit' },
+    ]);
     expect(report.validity).toEqual({
       notBefore: '2026-08-04T06:38:48.000Z',
       notAfter: '2053-12-20T06:38:48.000Z',
@@ -79,6 +90,38 @@ describe('mapCertificate', () => {
     expect(report.fingerprintSha256).toBe(
       'FF:69:D5:D0:34:43:AC:FE:E1:7B:7A:5D:6C:18:7E:70:52:30:C3:A2:80:B4:EC:A2:17:DD:BB:ED:6D:EB:D3:39',
     );
+  });
+
+  test('maps a CA-signed certificate issuer independently from its subject', async () => {
+    // Catches mapping issuer from certificate.subject: the fixture has a
+    // deliberately different, literal issuer DN and subject DN.
+    const { certificate, der } = parseCertificate(issuerSignedEdgeCertificatePem);
+
+    const report = await mapCertificate(certificate, der, new Date('2027-01-01T00:00:00.000Z'));
+
+    expect(report.subject).toEqual([
+      { oid: '2.5.4.6', name: 'Country', value: 'DE' },
+      { oid: '2.5.4.10', name: 'Organization', value: 'Daily Tools Client' },
+      { oid: '2.5.4.3', name: 'Common Name', value: 'edge.example.test' },
+    ]);
+    expect(report.issuer).toEqual([
+      { oid: '2.5.4.6', name: 'Country', value: 'US' },
+      { oid: '2.5.4.10', name: 'Organization', value: 'Daily Tools Lab' },
+      { oid: '2.5.4.11', name: 'Organizational Unit', value: 'Certificate Fixtures' },
+      { oid: '2.5.4.3', name: 'Common Name', value: 'rsa.example.test' },
+      { oid: '1.2.840.113549.1.9.1', name: 'Email Address', value: 'ops@example.test' },
+      { oid: '1.2.3.4.5', name: 'unknown', value: 'Research Unit' },
+    ]);
+  });
+
+  test('canonicalizes a positive serial whose DER INTEGER requires leading 00 padding', async () => {
+    // Catches exposing ASN.1 sign-padding octets instead of the certificate's
+    // canonical positive serial value. The hand-checked serial begins at 0x80.
+    const { certificate, der } = parseCertificate(issuerSignedEdgeCertificatePem);
+
+    const report = await mapCertificate(certificate, der, new Date('2027-01-01T00:00:00.000Z'));
+
+    expect(report.serialNumber).toBe('80A1B2C3D4E5F60718293A4B5C6D7E8F');
   });
 
   test('maps DNS, IP, email, URI and unknown SAN variants to a text-only union', async () => {
@@ -100,6 +143,22 @@ describe('mapCertificate', () => {
       },
     ]);
     expect(JSON.stringify(report.subjectAlternativeNames)).not.toMatch(/[<>]/);
+    expectPlainTextDto(report.subjectAlternativeNames);
+  });
+
+  test('maps object-valued GeneralNames without toBER to content-bearing safe text', async () => {
+    // Catches directoryName and other PKI.js object values collapsing to
+    // non-content-bearing JavaScript coercions such as "[object Object]".
+    const { certificate, der } = parseCertificate(issuerSignedEdgeCertificatePem);
+
+    const report = await mapCertificate(certificate, der, new Date('2027-01-01T00:00:00.000Z'));
+
+    expect(report.subjectAlternativeNames).toEqual([{
+      type: 'unknown',
+      tag: 4,
+      value: '30:4A:31:0B:30:09:06:03:55:04:06:13:02:4A:50:31:1A:30:18:06:03:55:04:0A:0C:11:44:69:72:65:63:74:6F:72:79:20:46:69:78:74:75:72:65:31:1F:30:1D:06:03:55:04:03:0C:16:64:69:72:65:63:74:6F:72:79:2E:65:78:61:6D:70:6C:65:2E:74:65:73:74',
+    }]);
+    expect(report.subjectAlternativeNames[0]?.value).not.toBe('[object Object]');
     expectPlainTextDto(report.subjectAlternativeNames);
   });
 
