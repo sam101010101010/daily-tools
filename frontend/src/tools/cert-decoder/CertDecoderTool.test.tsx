@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -269,6 +269,70 @@ test('removes a stale successful report before showing a subsequent decode error
 
   expect(await screen.findByRole('alert')).toHaveTextContent('提供的内容必须是一个完整的 PEM 块。');
   expect(screen.queryByRole('region', { name: '证书报告' })).not.toBeInTheDocument();
+});
+
+test('editing input immediately clears the report, copy controls and derived status', async () => {
+  // Catches associating a successfully decoded report or copy state with PEM
+  // text that the user has since changed without pressing decode again.
+  const user = userEvent.setup();
+  setClipboard(vi.fn().mockResolvedValue(undefined));
+  render(<CertDecoderTool />);
+  await decodeAs(rsaCertificatePem, '证书报告');
+  await user.click(screen.getByRole('button', { name: '复制 SHA-256 指纹' }));
+  expect(screen.getByRole('status')).toHaveTextContent('SHA-256 指纹已复制');
+
+  replacePem(rsaCsrPem);
+
+  expect(screen.getByLabelText('PEM 证书或 CSR')).toHaveValue(rsaCsrPem);
+  expect(screen.queryByRole('region', { name: /报告/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /复制 SHA-256 指纹|复制完整报告/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+  await decodeAs(rsaCertificatePem, '证书报告');
+  setClipboard(vi.fn().mockRejectedValue(new DOMException('denied', 'NotAllowedError')));
+  await user.click(screen.getByRole('button', { name: '复制完整报告' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('复制失败，请手动复制。');
+
+  replacePem(rsaCsrPem);
+
+  expect(screen.getByLabelText('PEM 证书或 CSR')).toHaveValue(rsaCsrPem);
+  expect(screen.queryByRole('region', { name: /报告/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('editing input invalidates an in-flight real mapper result', async () => {
+  // Catches an old async decode publishing after the textarea has changed.
+  // The seam only gates the real mapper; report creation remains production code.
+  const realMapCertificate = reportMappers.mapCertificate;
+  let signalStarted!: () => void;
+  const started = new Promise<void>(resolve => { signalStarted = resolve; });
+  let releaseMapper!: () => void;
+  const mapperGate = new Promise<void>(resolve => { releaseMapper = resolve; });
+  let signalCompleted!: () => void;
+  const completed = new Promise<void>(resolve => { signalCompleted = resolve; });
+  vi.spyOn(reportMappers, 'mapCertificate').mockImplementationOnce(async (...args) => {
+    signalStarted();
+    await mapperGate;
+    const mapped = await realMapCertificate(...args);
+    signalCompleted();
+    return mapped;
+  });
+  render(<CertDecoderTool />);
+  replacePem(rsaCertificatePem);
+  fireEvent.click(screen.getByRole('button', { name: '解码' }));
+  await started;
+
+  replacePem(rsaCsrPem);
+  expect(screen.getByLabelText('PEM 证书或 CSR')).toHaveValue(rsaCsrPem);
+
+  await act(async () => {
+    releaseMapper();
+    await completed;
+  });
+
+  expect(screen.queryByRole('region', { name: /报告/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /复制 SHA-256 指纹|复制完整报告/ })).not.toBeInTheDocument();
 });
 
 test('reset clears report and error and restores the safe public default', async () => {

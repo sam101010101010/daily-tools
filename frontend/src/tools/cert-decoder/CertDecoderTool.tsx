@@ -272,6 +272,15 @@ export default function CertDecoderTool() {
     }
   }
 
+  function changeInput(value: string) {
+    operationSequence.current += 1;
+    setInput(value);
+    setReport(undefined);
+    setError('');
+    setCopyStatus('');
+    setCopyError('');
+  }
+
   function reset() {
     operationSequence.current += 1;
     setInput(PUBLIC_CERTIFICATE);
@@ -301,7 +310,7 @@ export default function CertDecoderTool() {
         className="cert-decoder__editor"
         id="cert-decoder-input"
         value={input}
-        onChange={event => setInput(event.target.value)}
+        onChange={event => changeInput(event.target.value)}
         rows={14}
         spellCheck={false}
       />
