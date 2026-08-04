@@ -2,12 +2,15 @@ import * as asn1js from 'asn1js';
 import {
   AltName,
   BasicConstraints,
+  type CertificationRequest,
   ExtKeyUsage,
+  Extensions,
   type Certificate,
   type Extension,
   type GeneralName,
   type RelativeDistinguishedNames,
 } from 'pkijs';
+import { verifyCsrSignature, type CsrSignatureVerification } from './csrVerify';
 
 export type CertificateValidityState = 'not-yet-valid' | 'valid' | 'expired';
 
@@ -84,6 +87,26 @@ export type CertificateReport = Readonly<{
     extendedKeyUsage: ExtendedKeyUsageReport | null;
     unrecognized: readonly UnrecognizedExtensionReport[];
   }>;
+}>;
+
+export type CsrSubjectAlternativeNames =
+  | Readonly<{
+      status: 'present';
+      values: readonly SubjectAlternativeName[];
+    }>
+  | Readonly<{
+      status: 'absent';
+      label: '未包含';
+    }>;
+
+export type CertificationRequestReport = Readonly<{
+  kind: 'csr';
+  subject: readonly DistinguishedNameItem[];
+  subjectAlternativeNames: CsrSubjectAlternativeNames;
+  publicKeyAlgorithm: AlgorithmReport;
+  signatureAlgorithm: AlgorithmReport;
+  fingerprintSha256: string;
+  signature: CsrSignatureVerification;
 }>;
 
 const DN_NAMES: Readonly<Record<string, string>> = {
@@ -263,6 +286,21 @@ function mapSubjectAlternativeNames(extensions: readonly Extension[]): SubjectAl
     : [];
 }
 
+function mapRequestedSubjectAlternativeNames(
+  request: CertificationRequest,
+): CsrSubjectAlternativeNames {
+  const extensionRequest = request.attributes?.find(
+    attribute => attribute.type === '1.2.840.113549.1.9.14',
+  );
+  if (!extensionRequest?.values[0]) return { status: 'absent', label: '未包含' };
+
+  const extensions = new Extensions({ schema: extensionRequest.values[0] }).extensions;
+  const values = mapSubjectAlternativeNames(extensions);
+  return values.length > 0
+    ? { status: 'present', values }
+    : { status: 'absent', label: '未包含' };
+}
+
 function mapBasicConstraints(extensions: readonly Extension[]): BasicConstraintsReport | null {
   const extension = findExtension(extensions, '2.5.29.19');
   if (!extension || !(extension.parsedValue instanceof BasicConstraints)) return null;
@@ -346,5 +384,31 @@ export async function mapCertificate(
       extendedKeyUsage: mapExtendedKeyUsage(extensions),
       unrecognized: mapUnrecognizedExtensions(extensions),
     },
+  };
+}
+
+export async function mapCertificationRequest(
+  request: CertificationRequest,
+  der: Uint8Array,
+): Promise<CertificationRequestReport> {
+  const [digest, signature] = await Promise.all([
+    crypto.subtle.digest('SHA-256', new Uint8Array(der).buffer),
+    verifyCsrSignature(request),
+  ]);
+
+  return {
+    kind: 'csr',
+    subject: mapDistinguishedName(request.subject),
+    subjectAlternativeNames: mapRequestedSubjectAlternativeNames(request),
+    publicKeyAlgorithm: mapAlgorithm(
+      request.subjectPublicKeyInfo.algorithm.algorithmId,
+      PUBLIC_KEY_ALGORITHM_NAMES,
+    ),
+    signatureAlgorithm: mapAlgorithm(
+      request.signatureAlgorithm.algorithmId,
+      SIGNATURE_ALGORITHM_NAMES,
+    ),
+    fingerprintSha256: bytesToHex(new Uint8Array(digest)),
+    signature,
   };
 }
