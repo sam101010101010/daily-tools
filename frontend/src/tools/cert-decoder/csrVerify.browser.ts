@@ -19,6 +19,25 @@ export type CsrBrowserVerificationResult = Readonly<{
 
 type LoadFixture = (filename: BrowserFixture) => Promise<string>;
 
+const EXPECTED_RESULTS: readonly CsrBrowserVerificationResult[] = [
+  { fixture: 'rsa-csr.pem', status: 'valid' },
+  { fixture: 'rsa-csr-tampered.pem', status: 'invalid' },
+  { fixture: 'ecdsa-csr.pem', status: 'valid' },
+  { fixture: 'ecdsa-csr-tampered.pem', status: 'invalid' },
+];
+
+export function assertExpectedBrowserVerification(
+  results: readonly CsrBrowserVerificationResult[],
+): void {
+  const matches = results.length === EXPECTED_RESULTS.length
+    && results.every((result, index) =>
+      result.fixture === EXPECTED_RESULTS[index].fixture
+      && result.status === EXPECTED_RESULTS[index].status);
+  if (!matches) {
+    throw new Error('Browser verification results did not match the expected vector');
+  }
+}
+
 export async function runCsrBrowserVerification(
   load: LoadFixture,
 ): Promise<readonly CsrBrowserVerificationResult[]> {
