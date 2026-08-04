@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { CertificationRequest } from 'pkijs';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as reportMappers from './report';
 import type { CertificateReport } from './report';
@@ -152,6 +153,25 @@ describe('CSR discriminated report', () => {
 
     expect(report).toHaveTextContent('请求的主题备用名称未包含');
     expect(report).toHaveTextContent('签名有效');
+  });
+
+  test('sanitizes unsupported browser verification while retaining the real CSR report', async () => {
+    // Catches dropping or mislabelling the unsupported discriminant, leaking a
+    // native Web Crypto error, or broadening signature support into trust.
+    vi.spyOn(CertificationRequest.prototype, 'verify').mockRejectedValueOnce(
+      new DOMException('native algorithm detail must stay private', 'NotSupportedError'),
+    );
+    render(<CertDecoderTool />);
+
+    const report = await decodeAs(rsaCsrPem, 'CSR 报告');
+
+    expect(report).toHaveTextContent('rsa-csr.example.test');
+    expect(report).toHaveTextContent('security@example.test');
+    expect(report).toHaveTextContent('RSA（1.2.840.113549.1.1.1）');
+    expect(report).toHaveTextContent('4C:33:14:A0:8D:29:10:FA:BD:2F:44:42:37:A4:F8:ED:81:44:8B:2D:C6:E4:18:E1:BD:A8:70:5E:13:A6:56:F2');
+    expect(within(report).getByText('当前浏览器不支持验证此签名算法')).toBeInTheDocument();
+    expect(report).not.toHaveTextContent(/native algorithm detail|NotSupportedError/);
+    expect(report).not.toHaveTextContent(/身份|信任|受信任|已签发/);
   });
 });
 
