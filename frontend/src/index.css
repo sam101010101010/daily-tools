@@ -2396,3 +2396,250 @@ main section .cron__explanation li {
 
   .text-tool__columns { grid-template-columns: 1fr; }
 }
+
+/* ---- Local certificate / CSR decoder ---------------------------------- */
+
+.cert-decoder {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.cert-decoder__notice {
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  color: var(--text);
+  background: var(--accent-weak);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+.cert-decoder__notice p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cert-decoder__notice p + p { margin-top: 0.35rem; }
+
+.cert-decoder__notice strong { color: var(--accent-strong); }
+
+.cert-decoder__label {
+  display: block;
+  width: 100%;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.cert-decoder__editor {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 20rem;
+  margin: 0;
+  overflow: auto;
+  white-space: pre;
+}
+
+.cert-decoder__decode-actions,
+.cert-decoder__report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.cert-decoder__decode-actions button,
+.cert-decoder__report-actions button {
+  margin: 0;
+}
+
+.cert-decoder__report-actions {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.cert-decoder > .error-view,
+.cert-decoder__status {
+  margin: 0;
+}
+
+.cert-decoder__status {
+  align-self: flex-start;
+  color: var(--accent-strong);
+  font-size: 0.88rem;
+}
+
+.cert-decoder__report {
+  min-width: 0;
+  padding: 1rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.cert-decoder__report h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.15rem;
+}
+
+.cert-decoder__report h4 {
+  overflow-wrap: anywhere;
+}
+
+.cert-decoder__summary,
+.cert-decoder__extension-list {
+  display: block;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border-top: 0;
+}
+
+.cert-decoder__field {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 0.35fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cert-decoder__field:last-child { border-bottom: 0; }
+
+.cert-decoder__field dt,
+.cert-decoder__field dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cert-decoder__field dd {
+  color: var(--text);
+}
+
+.cert-decoder__mono,
+.cert-decoder__extension-value {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cert-decoder__extensions {
+  min-width: 0;
+  margin-top: 1.25rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.cert-decoder__extensions summary {
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cert-decoder__empty {
+  margin: 0.45rem 0 0;
+  color: var(--text-muted);
+}
+
+.cert-decoder__table-wrap {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.cert-decoder__table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.cert-decoder__table--san { min-width: 24rem; }
+
+.cert-decoder__table th,
+.cert-decoder__table td {
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cert-decoder__table thead th {
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  font-weight: 700;
+}
+
+.cert-decoder__table tbody tr:last-child td { border-bottom: 0; }
+
+.cert-decoder__table--dn th:nth-child(1),
+.cert-decoder__table--dn td:nth-child(1) { width: 9rem; }
+
+.cert-decoder__table--dn th:nth-child(2),
+.cert-decoder__table--dn td:nth-child(2) { width: 11rem; }
+
+.cert-decoder__table--san th:first-child,
+.cert-decoder__table--san td:first-child { width: 8rem; }
+
+.cert-decoder__table--extensions th:first-child,
+.cert-decoder__table--extensions td:first-child { width: 10rem; }
+
+.cert-decoder__table--extensions th:nth-child(2),
+.cert-decoder__table--extensions td:nth-child(2) { width: 6rem; }
+
+.cert-decoder :is(textarea, button, summary):focus-visible,
+.cert-decoder__table-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 390px) {
+  .cert-decoder {
+    gap: 0.8rem;
+    max-width: 100%;
+  }
+
+  .cert-decoder__notice,
+  .cert-decoder__report {
+    padding: 0.8rem;
+  }
+
+  .cert-decoder__editor {
+    min-height: 16rem;
+    font-size: 0.84rem;
+  }
+
+  .cert-decoder__decode-actions,
+  .cert-decoder__report-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cert-decoder__decode-actions button,
+  .cert-decoder__report-actions button {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .cert-decoder__field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .cert-decoder__table { min-width: 30rem; }
+
+  .cert-decoder__table--san { min-width: 20rem; }
+}

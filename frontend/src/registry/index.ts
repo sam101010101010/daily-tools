@@ -14,6 +14,7 @@ import { idGeneratorMeta } from '../tools/id-generator/meta';
 import { ipCidrMeta } from '../tools/ip-cidr/meta';
 import { qrMeta } from '../tools/qr/meta';
 import { textMeta } from '../tools/text/meta';
+import { certDecoderMeta } from '../tools/cert-decoder/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -31,6 +32,7 @@ export const tools: ToolMeta[] = [
   ipCidrMeta,
   qrMeta,
   textMeta,
+  certDecoderMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {

@@ -12,8 +12,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "asn1js": "3.0.10",
     "croner": "10.0.1",
     "hash-wasm": "^4.12.0",
+    "pkijs": "3.4.0",
     "qr": "0.6.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
