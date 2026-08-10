@@ -131,6 +131,9 @@ function advancedWeekdayText(profile: Exclude<CronProfileId, 'linux-vixie' | 'ma
 
 export function explainCron(cron: ParsedCron): CronExplanation {
   if ('fields' in cron) return explainFiveFieldCron(cron);
+  if ('disabled' in cron) {
+    return { profile: cron.profile, lines: ['Spring 的 @Scheduled 触发器已禁用，不会执行。'] };
+  }
   const fieldOrder = cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy'
     ? ['minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year']
     : cron.fieldValues.length === 7

@@ -35,7 +35,7 @@ test('all profile adapters construct paused evaluators without scheduling timers
 
       const preview = previewCron(parsed.value, 'UTC', new Date('2024-01-01T00:00:00.000Z'));
       if (unavailableError) {
-        expect(preview).toEqual({ ok: false, profile, error: unavailableError });
+        expect(preview).toEqual({ ok: false, profile, code: 'exact-preview-unavailable', error: unavailableError });
       } else {
         expect(preview).toMatchObject({ ok: true, profile });
       }
