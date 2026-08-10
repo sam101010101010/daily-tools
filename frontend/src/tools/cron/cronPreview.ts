@@ -34,6 +34,9 @@ function formatInTimeZone(date: Date, timeZone: string): string {
 }
 
 export function previewCron(cron: ParsedCron, timeZone: string, now: Date): CronPreviewResult {
+  if ('disabled' in cron) {
+    return { ok: false, profile: cron.profile, error: 'Spring 的 @Scheduled 触发器已禁用，无法预览未来运行时间' };
+  }
   if (hasLastDayOffset(cron)) {
     return { ok: false, profile: cron.profile, error: '该 Cron 方言的 L-n 日期偏移暂不能精确预览' };
   }

@@ -35,6 +35,7 @@ export type ParsedCron =
   | ParsedFiveFieldCron<'linux-vixie'>
   | ParsedFiveFieldCron<'macos-bsd'>
   | ParsedFiveFieldCron<'kubernetes'>
+  | ParsedDisabledSpringCron
   | ParsedAdvancedCron<'spring'>
   | ParsedAdvancedCron<'quartz'>
   | ParsedAdvancedCron<'eventbridge-scheduler'>
@@ -47,6 +48,12 @@ export type ParsedAdvancedCron<Profile extends AdvancedProfileId = AdvancedProfi
   /** The profile-native fields, without EventBridge's required cron(...) wrapper. */
   normalized: string;
   fieldValues: readonly string[];
+}>;
+
+export type ParsedDisabledSpringCron = Readonly<{
+  profile: 'spring';
+  normalized: '-';
+  disabled: true;
 }>;
 
 export type CronSyntaxErrorCode =
@@ -420,13 +427,13 @@ export function cronerPatternFor(cron: ParsedCron): string {
 }
 
 export function hasLastDayOffset(cron: ParsedCron): boolean {
-  if ('fields' in cron) return false;
+  if ('fields' in cron || 'disabled' in cron) return false;
   const dayOfMonth = cron.fieldValues[cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy' ? 2 : 3];
   return /^L-\d+$/.test(dayOfMonth);
 }
 
 export function hasBareLastDayOfWeek(cron: ParsedCron): boolean {
-  if ('fields' in cron) return false;
+  if ('fields' in cron || 'disabled' in cron) return false;
   const dayOfWeek = cron.fieldValues[cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy' ? 4 : 5];
   return dayOfWeek === 'L';
 }
@@ -444,6 +451,9 @@ export function cronerOptionsFor(cron: ParsedCron): Readonly<{
 
 function parseAdvancedProfile<Profile extends AdvancedProfileId>(profile: Profile, input: string): ParseCronResult {
   let normalized = input.trim().replace(/\s+/g, ' ');
+  if (profile === 'spring' && normalized === '-') {
+    return { ok: true, value: { profile, normalized: '-', disabled: true } };
+  }
   const isEventBridge = profile === 'eventbridge-scheduler' || profile === 'eventbridge-legacy';
   if (isEventBridge) {
     const inner = unwrapEventBridge(input);
