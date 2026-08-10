@@ -66,7 +66,7 @@ function fieldHint(profile: CronProfile, field: CronProfileFieldName): string {
     dayOfMonth: '日期（1–31）',
     month: '月份（1–12 / JAN–DEC）',
     dayOfWeek: weekday,
-    year: profile.id.startsWith('eventbridge-') ? '年份（1970–2199）' : '年份（1–9999）',
+    year: profile.id.startsWith('eventbridge-') ? '年份（1970–2199）' : profile.id === 'quartz' ? '年份（1970–2099）' : '年份（1–9999）',
   };
   return hints[field];
 }
@@ -108,7 +108,13 @@ function evaluate(profile: CronProfileId, expression: string, timeZone: string, 
     if (parsed.value.profile !== explanation.profile || parsed.value.profile !== preview.profile) {
       return { kind: 'error', profile, message: PREVIEW_FAILURE };
     }
-    if (!preview.ok) return { kind: 'error', profile, message: `时区：${preview.error}。` };
+    if (!preview.ok) {
+      return {
+        kind: 'error',
+        profile,
+        message: preview.code === 'invalid-time-zone' ? `时区：${preview.error}。` : preview.error,
+      };
+    }
 
     return {
       kind: 'success',

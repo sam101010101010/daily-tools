@@ -130,6 +130,7 @@ test('Kubernetes keeps the profile on invalid time-zone errors and handles month
   expect(previewCron(parsed.value, 'Mars/Olympus', new Date('2024-01-31T23:59:00.000Z'))).toEqual({
     ok: false,
     profile: 'kubernetes',
+    code: 'invalid-time-zone',
     error: '不是有效的 IANA 时区',
   });
 
@@ -158,6 +159,7 @@ test.each(['linux-vixie', 'macos-bsd'] as const)(
     expect(error).toEqual({
       ok: false,
       profile,
+      code: 'invalid-time-zone',
       error: '不是有效的 IANA 时区',
     });
   },
@@ -196,6 +198,7 @@ test('rejects an invalid IANA timezone before previewing', () => {
   expect(preview('0 0 * * *', 'Mars/Olympus', '2024-01-01T00:00:00.000Z')).toEqual({
     ok: false,
     profile: 'linux-vixie',
+    code: 'invalid-time-zone',
     error: '不是有效的 IANA 时区',
   });
 });
@@ -204,6 +207,7 @@ test('rejects an offset identifier that Intl accepts but is not an IANA timezone
   expect(preview('0 0 * * *', '+01:00', '2024-01-01T00:00:00.000Z')).toEqual({
     ok: false,
     profile: 'linux-vixie',
+    code: 'invalid-time-zone',
     error: '不是有效的 IANA 时区',
   });
 });

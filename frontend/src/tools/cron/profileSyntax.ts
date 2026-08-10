@@ -45,7 +45,7 @@ export type AdvancedProfileId = 'spring' | 'quartz' | 'eventbridge-scheduler' | 
 
 export type ParsedAdvancedCron<Profile extends AdvancedProfileId = AdvancedProfileId> = Readonly<{
   profile: Profile;
-  /** The profile-native fields, without EventBridge's required cron(...) wrapper. */
+  /** The normalized expression in the selected profile's native syntax. */
   normalized: string;
   fieldValues: readonly string[];
 }>;
@@ -397,8 +397,8 @@ function validateAdvancedFields<Profile extends AdvancedProfileId>(
       ? validDayOfMonth(token, !isEventBridge)
       : name === 'dayOfWeek'
         ? validDayOfWeek(token, minimum, fieldNamesMap ?? {})
-        : name === 'year' && isEventBridge
-          ? validYear(token, 1970, 2199)
+        : name === 'year'
+          ? validYear(token, 1970, isEventBridge ? 2199 : 2099)
           : validStandardField(token, minimum, maximum, fieldNamesMap);
     if (!valid) return advancedFailure(profile, name, 'invalid-value', '字段值无效');
   }
@@ -421,8 +421,8 @@ function cronOptionsFor(profile: AdvancedProfileId): Readonly<{
 }
 
 export function cronerPatternFor(cron: ParsedCron): string {
-  return cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy'
-    ? `0 ${cron.normalized}`
+  return 'fieldValues' in cron && (cron.profile === 'eventbridge-scheduler' || cron.profile === 'eventbridge-legacy')
+    ? `0 ${cron.fieldValues.join(' ')}`
     : cron.normalized;
 }
 
@@ -472,11 +472,11 @@ function parseAdvancedProfile<Profile extends AdvancedProfileId>(profile: Profil
   if (!validation.ok) return validation;
   const dayOfWeekIndex = isEventBridge ? 4 : 5;
   if (fields[dayOfWeekIndex] === 'L') {
-    return { ok: true, value: { profile, normalized, fieldValues: fields } };
+    return { ok: true, value: { profile, normalized: isEventBridge ? `cron(${fields.join(' ')})` : normalized, fieldValues: fields } };
   }
   try {
     const evaluatorNormalized = normalized.replace(/\bL-(?:[1-9]|[12]\d|30)\b/, 'L');
-    const evaluatorPattern = isEventBridge ? `0 ${evaluatorNormalized}` : evaluatorNormalized;
+    const evaluatorPattern = isEventBridge ? `0 ${fields.join(' ')}` : evaluatorNormalized;
     new Cron(evaluatorPattern, {
       paused: true,
       ...cronOptionsFor(profile),
@@ -484,5 +484,5 @@ function parseAdvancedProfile<Profile extends AdvancedProfileId>(profile: Profil
   } catch {
     return advancedFailure(profile, 'expression', 'semantic', 'Cron 表达式的字段组合无效');
   }
-  return { ok: true, value: { profile, normalized, fieldValues: fields } };
+  return { ok: true, value: { profile, normalized: isEventBridge ? `cron(${fields.join(' ')})` : normalized, fieldValues: fields } };
 }

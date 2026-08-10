@@ -59,6 +59,15 @@ test('lists exactly the seven approved profiles and adapts the visible field con
   }
 });
 
+test('shows Quartz’s documented 1970–2099 optional-year range', async () => {
+  const user = userEvent.setup();
+  render(<CronTool now={() => FIXED_NOW} />);
+
+  await user.selectOptions(screen.getByLabelText('Cron 方言 profile'), 'quartz');
+
+  expect(within(screen.getByLabelText('字段顺序')).getByText('年份（1970–2099）')).toBeInTheDocument();
+});
+
 test('keeps input text but synchronously clears old results when the profile changes', async () => {
   const user = userEvent.setup();
   render(<CronTool now={() => FIXED_NOW} />);
@@ -224,4 +233,54 @@ test('submits on Enter and copies the selected profile normalized expression and
   expect(storageSetSpy).not.toHaveBeenCalled();
   expect(storageRemoveSpy).not.toHaveBeenCalled();
   expect(storageClearSpy).not.toHaveBeenCalled();
+});
+
+test.each(['eventbridge-scheduler', 'eventbridge-legacy'] as const)(
+  '%s copies the required EventBridge wrapper around its normalized expression',
+  async (profile) => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    render(<CronTool now={() => FIXED_NOW} />);
+
+    await user.selectOptions(screen.getByLabelText('Cron 方言 profile'), profile);
+    await user.type(screen.getByLabelText('Cron 表达式'), 'CRON( 0 9 ? * mon-fri 2024 )');
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: '复制表达式' }));
+
+    expect(writeText).toHaveBeenLastCalledWith('cron(0 9 ? * MON-FRI 2024)');
+  },
+);
+
+test('prefixes only the typed invalid-IANA preview failure with the time-zone label', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(cronPreview, 'previewCron').mockImplementationOnce((cron) => ({
+    ok: false,
+    profile: cron.profile,
+    code: 'invalid-time-zone',
+    error: '不是有效的 IANA 时区',
+  }));
+  render(<CronTool now={() => FIXED_NOW} />);
+
+  await user.selectOptions(screen.getByLabelText('Cron 方言 profile'), 'linux-vixie');
+  await user.click(screen.getByRole('button', { name: '填入示例' }));
+  await user.click(screen.getByLabelText('Cron 表达式'));
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('alert')).toHaveTextContent('时区：不是有效的 IANA 时区。');
+});
+
+test.each([
+  ['quartz', '0 0 9 L-3 * ?', '该 Cron 方言的 L-n 日期偏移暂不能精确预览'],
+  ['spring', '-', 'Spring 的 @Scheduled 触发器已禁用，无法预览未来运行时间'],
+] as const)('shows %s preview limitations directly instead of as time-zone errors', async (profile, expression, message) => {
+  const user = userEvent.setup();
+  render(<CronTool now={() => FIXED_NOW} />);
+
+  await user.selectOptions(screen.getByLabelText('Cron 方言 profile'), profile);
+  await user.type(screen.getByLabelText('Cron 表达式'), expression);
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('alert')).toHaveTextContent(message);
+  expect(screen.getByRole('alert')).not.toHaveTextContent('时区：');
 });

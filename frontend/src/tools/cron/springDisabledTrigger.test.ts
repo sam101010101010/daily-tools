@@ -28,6 +28,7 @@ test('Spring disabled sentinel short-circuits parsing, explanation, and preview 
   expect(previewCron(parsed.value, 'UTC', new Date('2024-01-01T00:00:00.000Z'))).toEqual({
     ok: false,
     profile: 'spring',
+    code: 'disabled',
     error: 'Spring 的 @Scheduled 触发器已禁用，无法预览未来运行时间',
   });
   expect(cronConstructor).not.toHaveBeenCalled();

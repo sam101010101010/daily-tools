@@ -9,9 +9,11 @@ export type CronRun = Readonly<{
   local: string;
 }>;
 
+export type CronPreviewFailureCode = 'invalid-time-zone' | 'exact-preview-unavailable' | 'disabled';
+
 export type CronPreviewResult =
   | Readonly<{ ok: true; profile: CronProfileId; value: Readonly<{ timeZone: string; runs: readonly CronRun[] }> }>
-  | Readonly<{ ok: false; profile: CronProfileId; error: string }>;
+  | Readonly<{ ok: false; profile: CronProfileId; code: CronPreviewFailureCode; error: string }>;
 
 function isValidIanaTimeZone(timeZone: string): boolean {
   if (!IANA_TIME_ZONE_NAME.test(timeZone)) return false;
@@ -35,17 +37,17 @@ function formatInTimeZone(date: Date, timeZone: string): string {
 
 export function previewCron(cron: ParsedCron, timeZone: string, now: Date): CronPreviewResult {
   if ('disabled' in cron) {
-    return { ok: false, profile: cron.profile, error: 'Spring 的 @Scheduled 触发器已禁用，无法预览未来运行时间' };
+    return { ok: false, profile: cron.profile, code: 'disabled', error: 'Spring 的 @Scheduled 触发器已禁用，无法预览未来运行时间' };
   }
   if (hasLastDayOffset(cron)) {
-    return { ok: false, profile: cron.profile, error: '该 Cron 方言的 L-n 日期偏移暂不能精确预览' };
+    return { ok: false, profile: cron.profile, code: 'exact-preview-unavailable', error: '该 Cron 方言的 L-n 日期偏移暂不能精确预览' };
   }
   if (hasBareLastDayOfWeek(cron)) {
-    return { ok: false, profile: cron.profile, error: '该 Cron 方言的星期 L 值暂不能精确预览' };
+    return { ok: false, profile: cron.profile, code: 'exact-preview-unavailable', error: '该 Cron 方言的星期 L 值暂不能精确预览' };
   }
   const effectiveTimeZone = cron.profile === 'eventbridge-legacy' ? 'UTC' : timeZone;
   if (!isValidIanaTimeZone(effectiveTimeZone)) {
-    return { ok: false, profile: cron.profile, error: '不是有效的 IANA 时区' };
+    return { ok: false, profile: cron.profile, code: 'invalid-time-zone', error: '不是有效的 IANA 时区' };
   }
 
   const evaluator = new Cron(cronerPatternFor(cron), {

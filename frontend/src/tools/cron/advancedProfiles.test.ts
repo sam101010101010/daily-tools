@@ -28,6 +28,7 @@ test.each([
   expect(previewCron(parsed, 'UTC', new Date('2024-02-01T00:00:00.000Z'))).toEqual({
     ok: false,
     profile,
+    code: 'exact-preview-unavailable',
     error: '该 Cron 方言的 L-n 日期偏移暂不能精确预览',
   });
 });
@@ -60,7 +61,7 @@ test.each([
 ] as const)('%s accepts bare DOW L but declines an inexact preview', (profile, expression) => {
   const parsed = parse(profile, expression);
   expect(previewCron(parsed, 'UTC', new Date('2024-01-01T00:00:00.000Z'))).toEqual({
-    ok: false, profile, error: '该 Cron 方言的星期 L 值暂不能精确预览',
+    ok: false, profile, code: 'exact-preview-unavailable', error: '该 Cron 方言的星期 L 值暂不能精确预览',
   });
 });
 
@@ -97,13 +98,25 @@ test('Quartz accepts six or seven fields with Sunday-first weekdays and special 
   });
 });
 
+test('Quartz limits an optional year to 1970–2099 without narrowing legal in-range expressions', () => {
+  for (const year of ['1970', '2099', '*', '1970,1980,2099', '1970-2099', '1970-2099/10']) {
+    expect(parseCron('quartz', `0 0 9 ? * MON-FRI ${year}`)).toMatchObject({ ok: true, value: { profile: 'quartz' } });
+  }
+  for (const year of ['1969', '2100']) {
+    expect(parseCron('quartz', `0 0 9 ? * MON-FRI ${year}`)).toMatchObject({
+      ok: false,
+      error: { profile: 'quartz', field: 'year', code: 'invalid-value' },
+    });
+  }
+});
+
 test.each(['eventbridge-scheduler', 'eventbridge-legacy'] as const)(
   '%s requires cron(...) with minute-first six fields and the EventBridge year range',
   (profile) => {
-    expect(parse(profile, 'cron(0 9 ? * MON-FRI 2024-2026)').normalized).toBe('0 9 ? * MON-FRI 2024-2026');
-    expect(parse(profile, 'cron(0 9 L * ? 2024)').normalized).toBe('0 9 L * ? 2024');
-    expect(parse(profile, 'cron(0 9 15W * ? 2024)').normalized).toBe('0 9 15W * ? 2024');
-    expect(parse(profile, 'cron(0 9 ? * 2#2 2024)').normalized).toBe('0 9 ? * 2#2 2024');
+    expect(parse(profile, 'cron(0 9 ? * MON-FRI 2024-2026)').normalized).toBe('cron(0 9 ? * MON-FRI 2024-2026)');
+    expect(parse(profile, 'cron(0 9 L * ? 2024)').normalized).toBe('cron(0 9 L * ? 2024)');
+    expect(parse(profile, 'cron(0 9 15W * ? 2024)').normalized).toBe('cron(0 9 15W * ? 2024)');
+    expect(parse(profile, 'cron(0 9 ? * 2#2 2024)').normalized).toBe('cron(0 9 ? * 2#2 2024)');
     expect(parseCron(profile, '0 9 ? * MON-FRI 2024')).toMatchObject({
       ok: false, error: { profile, field: 'expression', code: 'unsupported' },
     });
@@ -113,6 +126,19 @@ test.each(['eventbridge-scheduler', 'eventbridge-legacy'] as const)(
     expect(parseCron(profile, 'cron(0 9 1 * 2 2024)')).toMatchObject({
       ok: false, error: { profile, field: 'expression', code: 'semantic' },
     });
+  },
+);
+
+test.each(['eventbridge-scheduler', 'eventbridge-legacy'] as const)(
+  '%s keeps its required lowercase wrapper in the normalized copy value while explanation and preview use native fields',
+  (profile) => {
+    const parsed = parse(profile, 'CRON( 0 9 ? * mon-fri 2024 )');
+
+    expect(parsed.normalized).toBe('cron(0 9 ? * MON-FRI 2024)');
+    if (!('fieldValues' in parsed)) throw new Error('Expected an advanced EventBridge parse result');
+    expect(parsed.fieldValues).toEqual(['0', '9', '?', '*', 'MON-FRI', '2024']);
+    expect(explainCron(parsed)).toMatchObject({ profile });
+    expect(previewCron(parsed, 'UTC', new Date('2024-01-01T00:00:00.000Z'))).toMatchObject({ ok: true, profile });
   },
 );
 
