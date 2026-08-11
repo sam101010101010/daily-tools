@@ -111,7 +111,8 @@ export default function TimezoneTool() {
         <label htmlFor="timezone-input">源日期和时间</label>
         <input
           id="timezone-input"
-          type="datetime-local"
+          type="text"
+          placeholder="YYYY-MM-DDTHH:mm"
           value={input}
           onChange={event => {
             clearSourceInteraction();

@@ -41,6 +41,15 @@ test('defaults from the browser once and renders ordinary source and target card
   expect(screen.getByLabelText('目标时区结果 1')).toHaveTextContent('01:23');
 });
 
+test('exposes the approved wall-time syntax in an editable text control', () => {
+  render(<TimezoneTool />);
+
+  const input = screen.getByRole('textbox', { name: '源日期和时间' });
+  expect(input).toHaveAttribute('type', 'text');
+  expect(input).toHaveAttribute('placeholder', 'YYYY-MM-DDTHH:mm');
+  expect(input).toHaveValue('2026-08-11T09:23');
+});
+
 test('falls back to UTC when the browser does not report a time zone', () => {
   const RealDateTimeFormat = Intl.DateTimeFormat;
   const fallbackDateTimeFormat = function (...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
