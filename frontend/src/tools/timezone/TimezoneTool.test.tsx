@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import TimezoneTool from './TimezoneTool';
@@ -201,6 +201,23 @@ test('copies real DTO strings and announces clipboard failures', async () => {
   expect(screen.getByRole('status')).toHaveTextContent('复制失败，请手动复制。');
 });
 
+test('copies each target card with its exact DTO text', async () => {
+  const user = renderInteractive();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+
+  await user.click(screen.getByRole('button', { name: '添加目标时区' }));
+  await choose(user, '目标时区 2', 'America/New_York');
+  await user.click(screen.getByRole('button', { name: '复制目标时间 1' }));
+  await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(
+    '2026-08-11 01:23 UTC (UTC+00:00, 与源日期同日)',
+  ));
+  await user.click(screen.getByRole('button', { name: '复制目标时间 2' }));
+  await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(
+    '2026-08-10 21:23 America/New_York (UTC-04:00, -1 天)',
+  ));
+});
+
 test('does not use network, storage, or timers while converting', async () => {
   vi.useRealTimers();
   const fetchSpy = vi.fn();
@@ -209,10 +226,23 @@ test('does not use network, storage, or timers while converting', async () => {
   const interval = vi.spyOn(globalThis, 'setInterval');
   const timeout = vi.spyOn(globalThis, 'setTimeout');
   vi.stubGlobal('fetch', fetchSpy);
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   render(<TimezoneTool />);
 
-  fireEvent.change(screen.getByLabelText('源时区'), { target: { value: 'UTC' } });
+  fireEvent.change(screen.getByLabelText('源日期和时间'), { target: { value: '2026-08-11T09:23' } });
+  fireEvent.change(screen.getByLabelText('源时区'), { target: { value: 'America/New_York' } });
   fireEvent.click(screen.getByRole('button', { name: '添加目标时区' }));
+  fireEvent.change(screen.getByLabelText('目标时区 2'), { target: { value: 'Europe/London' } });
+  fireEvent.click(screen.getByRole('button', { name: '上移目标时区 2' }));
+  fireEvent.click(screen.getByRole('button', { name: '下移目标时区 1' }));
+  fireEvent.click(screen.getByRole('button', { name: '删除目标时区 2' }));
+  fireEvent.change(screen.getByLabelText('源日期和时间'), { target: { value: '2024-11-03T01:30' } });
+  fireEvent.click(screen.getByRole('radio', { name: /较早.*UTC-04:00/ }));
+  fireEvent.click(screen.getByRole('button', { name: '复制源时间' }));
+  fireEvent.click(screen.getByRole('button', { name: '复制目标时间 1' }));
+  fireEvent.click(screen.getByRole('button', { name: '复制全部' }));
+  await act(async () => { await Promise.resolve(); });
 
   expect(fetchSpy).not.toHaveBeenCalled();
   expect(getItem).not.toHaveBeenCalled();
