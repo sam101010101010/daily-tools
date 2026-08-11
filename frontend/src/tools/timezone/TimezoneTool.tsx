@@ -33,7 +33,7 @@ function zoneOptions(zones: readonly string[], targetTimeZones: readonly string[
 
 export default function TimezoneTool() {
   const [browserZone] = useState(browserTimeZone);
-  const zones = listSupportedTimeZones(browserZone);
+  const [zones] = useState(() => listSupportedTimeZones(browserZone));
   const [input, setInput] = useState(() => formatInitialWallTime(new Date(), browserZone));
   const [sourceTimeZone, setSourceTimeZone] = useState(browserZone);
   const [targetTimeZones, setTargetTimeZones] = useState<string[]>(['UTC']);

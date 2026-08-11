@@ -1,21 +1,50 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
+import * as timeZoneLib from '../../lib/timeZone';
 import TimezoneTool from './TimezoneTool';
 
-const realResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
+const RealIntl = Intl;
+const RealDateTimeFormat = Intl.DateTimeFormat;
+let reportedBrowserTimeZone = 'Asia/Shanghai';
+
+function installBrowserTimeZoneStub() {
+  const DateTimeFormat = function (...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+    const formatter = new RealDateTimeFormat(...args);
+    if (args.length > 0) return formatter;
+    return new Proxy(formatter, {
+      get(target, property, receiver) {
+        if (property === 'resolvedOptions') {
+          return () => ({ ...target.resolvedOptions(), timeZone: reportedBrowserTimeZone });
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  } as unknown as typeof Intl.DateTimeFormat;
+  Object.setPrototypeOf(DateTimeFormat, RealDateTimeFormat);
+  const stubIntl = Object.create(RealIntl) as typeof Intl;
+  Object.defineProperty(stubIntl, 'DateTimeFormat', { value: DateTimeFormat });
+  vi.stubGlobal('Intl', stubIntl);
+}
+
+beforeAll(() => {
+  installBrowserTimeZoneStub();
+});
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-08-11T01:23:45Z'));
-  vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockImplementation(function resolvedOptions(this: Intl.DateTimeFormat) {
-    return { ...realResolvedOptions.call(this), timeZone: 'Asia/Shanghai' };
-  });
+  reportedBrowserTimeZone = 'Asia/Shanghai';
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
 });
 
 async function choose(user: ReturnType<typeof userEvent.setup>, label: string, value: string) {
@@ -50,25 +79,21 @@ test('exposes the approved wall-time syntax in an editable text control', () => 
   expect(input).toHaveValue('2026-08-11T09:23');
 });
 
+test('builds the supported zone list once across interaction rerenders', async () => {
+  const listSpy = vi.spyOn(timeZoneLib, 'listSupportedTimeZones');
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  const user = renderInteractive();
+
+  fireEvent.change(screen.getByLabelText('源日期和时间'), { target: { value: '2026-08-11T10:23' } });
+  await user.click(screen.getByRole('button', { name: '复制源时间' }));
+  await screen.findByRole('status');
+
+  expect(listSpy).toHaveBeenCalledTimes(1);
+});
+
 test('falls back to UTC when the browser does not report a time zone', () => {
-  const RealDateTimeFormat = Intl.DateTimeFormat;
-  const fallbackDateTimeFormat = function (...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
-    const formatter = new RealDateTimeFormat(...args);
-    if (args.length > 0) return formatter;
-    return new Proxy(formatter, {
-      get(target, property, receiver) {
-        if (property === 'resolvedOptions') {
-          return () => ({ ...target.resolvedOptions(), timeZone: '' });
-        }
-        const value = Reflect.get(target, property, receiver);
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-    });
-  } as unknown as typeof Intl.DateTimeFormat;
-  Object.setPrototypeOf(fallbackDateTimeFormat, RealDateTimeFormat);
-  const fallbackIntl = Object.create(Intl) as typeof Intl;
-  Object.defineProperty(fallbackIntl, 'DateTimeFormat', { value: fallbackDateTimeFormat });
-  vi.stubGlobal('Intl', fallbackIntl);
+  reportedBrowserTimeZone = '';
   render(<TimezoneTool />);
 
   expect(screen.getByLabelText('源时区')).toHaveValue('UTC');
