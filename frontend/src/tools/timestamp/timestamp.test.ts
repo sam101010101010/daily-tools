@@ -66,6 +66,13 @@ test('interprets an ISO value without an offset in the selected time zone', () =
   });
 });
 
+test('keeps optional ISO seconds and milliseconds when resolving an offset-free local time', () => {
+  expect(convertTimestamp('2024-01-15T09:30:45.123', 'iso', 'Asia/Shanghai')).toMatchObject({
+    ok: true,
+    value: { epochMilliseconds: 1_705_282_245_123 },
+  });
+});
+
 test('rejects an ambiguous numeric value in automatic mode', () => {
   expect(convertTimestamp('17040672000', 'auto', 'UTC')).toEqual({
     ok: false,

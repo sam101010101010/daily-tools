@@ -1,3 +1,5 @@
+import { formatInstant, resolveWallTime } from '../../lib/timeZone';
+
 export type TimestampInputType = 'auto' | 'seconds' | 'milliseconds' | 'iso';
 
 export type TimestampValue = Readonly<{
@@ -10,47 +12,8 @@ export type ConvertTimestampResult =
   | Readonly<{ ok: true; value: TimestampValue }>
   | Readonly<{ ok: false; error: string }>;
 
-type DateTimeParts = Readonly<{
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-}>;
-
-type LocalIsoParseResult =
-  | Readonly<{ ok: true; epochMilliseconds: number }>
-  | Readonly<{ ok: false; reason: 'invalid' | 'ambiguous' }>;
-
-function getDateTimeParts(epochMilliseconds: number, timeZone: string): DateTimeParts {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(epochMilliseconds));
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return {
-    year: Number(values.year), month: Number(values.month), day: Number(values.day),
-    hour: Number(values.hour), minute: Number(values.minute), second: Number(values.second),
-  };
-}
-
 export function formatInTimeZone(epochMilliseconds: number, timeZone: string): string {
-  const parts = getDateTimeParts(epochMilliseconds, timeZone);
-  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')} ${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}:${String(parts.second).padStart(2, '0')}`;
-}
-
-function sameDateTimeParts(left: DateTimeParts, right: DateTimeParts): boolean {
-  return left.year === right.year && left.month === right.month && left.day === right.day &&
-    left.hour === right.hour && left.minute === right.minute && left.second === right.second;
-}
-
-function timeZoneOffsetAt(epochMilliseconds: number, timeZone: string): number {
-  const parts = getDateTimeParts(epochMilliseconds, timeZone);
-  const renderedAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-  return renderedAsUtc - Math.trunc(epochMilliseconds / 1_000) * 1_000;
+  return formatInstant(epochMilliseconds, timeZone).dateTimeSeconds;
 }
 
 function hasValidIsoCalendarDate(input: string): boolean {
@@ -73,45 +36,6 @@ function hasValidIsoCalendarDate(input: string): boolean {
     normalized.getUTCMilliseconds() === millisecond;
 }
 
-function parseLocalIso(input: string, timeZone: string): LocalIsoParseResult {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(input);
-  if (!match) return { ok: false, reason: 'invalid' };
-
-  const [, yearText, monthText, dayText, hourText, minuteText, secondText = '0', millisecondText = '0'] = match;
-  const target = {
-    year: Number(yearText), month: Number(monthText), day: Number(dayText),
-    hour: Number(hourText), minute: Number(minuteText), second: Number(secondText),
-    millisecond: Number(millisecondText.padEnd(3, '0')),
-  };
-  let epochMilliseconds = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute, target.second, target.millisecond);
-  const normalized = new Date(epochMilliseconds);
-  if (
-    normalized.getUTCFullYear() !== target.year || normalized.getUTCMonth() + 1 !== target.month ||
-    normalized.getUTCDate() !== target.day || normalized.getUTCHours() !== target.hour ||
-    normalized.getUTCMinutes() !== target.minute || normalized.getUTCSeconds() !== target.second
-  ) return { ok: false, reason: 'invalid' };
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const actual = getDateTimeParts(epochMilliseconds, timeZone);
-    const targetAsUtc = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute, target.second);
-    const actualAsUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second);
-    epochMilliseconds += targetAsUtc - actualAsUtc;
-  }
-
-  const resolved = getDateTimeParts(epochMilliseconds, timeZone);
-  if (!sameDateTimeParts(resolved, target)) return { ok: false, reason: 'invalid' };
-
-  const targetAsUtc = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute, target.second, target.millisecond);
-  const offsets = new Set([
-    timeZoneOffsetAt(epochMilliseconds - 12 * 60 * 60 * 1_000, timeZone),
-    timeZoneOffsetAt(epochMilliseconds, timeZone),
-    timeZoneOffsetAt(epochMilliseconds + 12 * 60 * 60 * 1_000, timeZone),
-  ]);
-  const candidates = [...offsets].filter((offset) => sameDateTimeParts(getDateTimeParts(targetAsUtc - offset, timeZone), target));
-  if (candidates.length > 1) return { ok: false, reason: 'ambiguous' };
-  return { ok: true, epochMilliseconds };
-}
-
 export function convertTimestamp(
   input: string,
   inputType: TimestampInputType,
@@ -132,16 +56,12 @@ export function convertTimestamp(
     if (/(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmedInput)) {
       epochMilliseconds = hasValidIsoCalendarDate(trimmedInput) ? Date.parse(trimmedInput) : Number.NaN;
     } else {
-      const localResult = parseLocalIso(trimmedInput, _timeZone);
-      if (!localResult.ok) {
-        return {
-          ok: false,
-          error: localResult.reason === 'ambiguous'
-            ? '所选时区中该本地时间存在歧义，请使用带时区的 ISO 8601'
-            : '不是有效的 ISO 8601 时间',
-        };
+      const localResult = resolveWallTime(trimmedInput, _timeZone);
+      if (localResult.kind === 'fold') {
+        return { ok: false, error: '所选时区中该本地时间存在歧义，请使用带时区的 ISO 8601' };
       }
-      epochMilliseconds = localResult.epochMilliseconds;
+      if (localResult.kind !== 'unique') return { ok: false, error: '不是有效的 ISO 8601 时间' };
+      epochMilliseconds = localResult.candidates[0];
     }
   } else if (resolvedInputType === 'seconds' || resolvedInputType === 'milliseconds') {
     if (!/^[+-]?\d+$/.test(trimmedInput)) {
