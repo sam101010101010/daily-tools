@@ -37,6 +37,30 @@ test('keeps optional seconds and milliseconds when resolving timestamp-compatibl
   });
 });
 
+test('resolves four-digit UTC wall times before year 0100 without Date.UTC coercion', () => {
+  expect(resolveWallTime('0001-01-01T00:00', 'UTC')).toEqual({
+    kind: 'unique', candidates: [-62_135_596_800_000],
+  });
+  expect(resolveWallTime('0099-01-01T00:00', 'UTC')).toEqual({
+    kind: 'unique', candidates: [-59_042_995_200_000],
+  });
+});
+
+test('formats UTC instants before year 0100 with zero-padded dates and the zero offset', () => {
+  expect(formatInstant(-62_135_596_800_000, 'UTC')).toMatchObject({
+    date: '0001-01-01', dateTime: '0001-01-01 00:00', offset: 'UTC+00:00',
+  });
+  expect(formatInstant(-59_042_995_200_000, 'UTC')).toMatchObject({
+    date: '0099-01-01', dateTime: '0099-01-01 00:00', offset: 'UTC+00:00',
+  });
+});
+
+test('rejects year 0000 rather than assigning astronomical or BCE semantics', () => {
+  expect(resolveWallTime('0000-01-01T00:00', 'UTC')).toEqual({
+    kind: 'invalid', message: '不是有效的本地时间或 IANA 时区',
+  });
+});
+
 test('formats a fractional-offset IANA zone with stable date, time, and offset fields', () => {
   expect(formatInstant(0, 'Asia/Kathmandu')).toMatchObject({
     date: '1970-01-01', time: '05:30', offset: 'UTC+05:30',

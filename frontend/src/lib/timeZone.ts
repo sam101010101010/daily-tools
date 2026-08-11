@@ -53,6 +53,13 @@ function isValidTimeZone(timeZone: string): boolean {
   }
 }
 
+function utcEpochMilliseconds(parts: WallTimeParts | DateTimeParts): number {
+  const instant = new Date(0);
+  instant.setUTCFullYear(parts.year, parts.month - 1, parts.day);
+  instant.setUTCHours(parts.hour, parts.minute, parts.second, 'millisecond' in parts ? parts.millisecond : 0);
+  return instant.getTime();
+}
+
 function parseWallTime(input: string): WallTimeParts | undefined {
   const match = WALL_TIME_PATTERN.exec(input);
   if (!match) return undefined;
@@ -67,15 +74,8 @@ function parseWallTime(input: string): WallTimeParts | undefined {
     second: Number(secondText),
     millisecond: Number(millisecondText.padEnd(3, '0')),
   };
-  const normalized = new Date(Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-    parts.millisecond,
-  ));
+  if (parts.year === 0) return undefined;
+  const normalized = new Date(utcEpochMilliseconds(parts));
   if (
     Number.isNaN(normalized.getTime()) ||
     normalized.getUTCFullYear() !== parts.year || normalized.getUTCMonth() + 1 !== parts.month ||
@@ -107,7 +107,7 @@ function sameDateTimeParts(left: DateTimeParts, right: DateTimeParts): boolean {
 
 function timeZoneOffsetAt(epochMilliseconds: number, timeZone: string): number {
   const parts = getDateTimeParts(epochMilliseconds, timeZone);
-  const renderedAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const renderedAsUtc = utcEpochMilliseconds(parts);
   return renderedAsUtc - Math.floor(epochMilliseconds / 1_000) * 1_000;
 }
 
@@ -131,15 +131,7 @@ export function resolveWallTime(input: string, timeZone: string): WallTimeResolu
     return { kind: 'invalid', message: INVALID_WALL_TIME };
   }
 
-  const naiveUtc = Date.UTC(
-    target.year,
-    target.month - 1,
-    target.day,
-    target.hour,
-    target.minute,
-    target.second,
-    target.millisecond,
-  );
+  const naiveUtc = utcEpochMilliseconds(target);
   if (!isValidInstant(naiveUtc)) return { kind: 'invalid', message: INVALID_WALL_TIME };
 
   const offsets = new Set<number>();

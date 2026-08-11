@@ -70,6 +70,23 @@ test('defaults from the browser once and renders ordinary source and target card
   expect(screen.getByLabelText('目标时区结果 1')).toHaveTextContent('01:23');
 });
 
+test('connects semantic timezone style hooks to ready and ambiguous surfaces', async () => {
+  const user = renderInteractive();
+
+  expect(screen.getByLabelText('目标时区 1').parentElement).toHaveClass('timezone__targets');
+  expect(screen.getByLabelText('时区转换结果')).toHaveClass('timezone__results');
+  expect(screen.getByLabelText('源时区结果')).toHaveClass('timezone__card');
+  expect(screen.getByLabelText('目标时区结果 1')).toHaveClass('timezone__card');
+  expect(screen.getByText('UTC+08:00')).toHaveClass('timezone__offset');
+  expect(screen.getAllByText('与源日期同日')[0]).toHaveClass('timezone__day-delta');
+
+  await choose(user, '源时区', 'America/New_York');
+  await user.clear(screen.getByLabelText('源日期和时间'));
+  await user.type(screen.getByLabelText('源日期和时间'), '2024-11-03T01:30');
+
+  expect(screen.getByRole('group', { name: '请选择夏令时结束时刻' })).toHaveClass('timezone__ambiguity');
+});
+
 test('exposes the approved wall-time syntax in an editable text control', () => {
   render(<TimezoneTool />);
 

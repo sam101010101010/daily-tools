@@ -75,5 +75,8 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/\.timezone__day-delta[^}]*var\(--accent-strong\)/);
     expect(css).toMatch(/\.timezone__card[^}]*overflow-wrap:\s*anywhere/);
     expect(css).toMatch(/@media \(max-width: 640px\)\s*\{[\s\S]*\.timezone__controls[^}]*grid-template-columns:\s*1fr[\s\S]*\.timezone__results[^}]*grid-template-columns:\s*1fr/);
+    expect(css).not.toMatch(/\[aria-label=["']时区转换结果["']\]/);
+    expect(css).not.toMatch(/\.timezone\s*>\s*fieldset|\.timezone\s*>\s*\[[^\]]+\]\s*>\s*section/);
+    expect(css).not.toMatch(/p:nth-of-type/);
   });
 });

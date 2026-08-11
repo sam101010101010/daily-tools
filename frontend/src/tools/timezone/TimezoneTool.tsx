@@ -94,12 +94,12 @@ export default function TimezoneTool() {
     const label = rowLabel(row, targetIndex);
     const copyName = row.role === 'source' ? '复制源时间' : `复制目标时间 ${targetIndex}`;
     return (
-      <section key={`${row.role}-${targetIndex ?? 0}`} aria-label={label}>
+      <section className="timezone__card" key={`${row.role}-${targetIndex ?? 0}`} aria-label={label}>
         <h2>{row.role === 'source' ? '源时区' : `目标时区 ${targetIndex}`}</h2>
         <p>{row.timeZone}</p>
         <p>{row.date} {row.time}</p>
-        <p>{row.offset}</p>
-        <p>{row.dayDelta === 0 ? '与源日期同日' : `${row.dayDelta > 0 ? '+' : ''}${row.dayDelta} 天`}</p>
+        <p className="timezone__offset">{row.offset}</p>
+        <p className="timezone__day-delta">{row.dayDelta === 0 ? '与源日期同日' : `${row.dayDelta > 0 ? '+' : ''}${row.dayDelta} 天`}</p>
         <button type="button" aria-label={copyName} onClick={() => void copy(row.copyText)}>复制</button>
       </section>
     );
@@ -132,7 +132,7 @@ export default function TimezoneTool() {
         </select>
 
         {targetTimeZones.map((targetTimeZone, index) => (
-          <div key={`${index}-${targetTimeZone}`}>
+          <div className="timezone__targets" key={`${index}-${targetTimeZone}`}>
             <label htmlFor={`timezone-target-${index}`}>目标时区 {index + 1}</label>
             <select
               id={`timezone-target-${index}`}
@@ -173,7 +173,7 @@ export default function TimezoneTool() {
       {(comparison.status === 'invalid' || comparison.status === 'gap') && <ErrorView message={comparison.message} />}
 
       {comparison.status === 'ambiguous' && (
-        <fieldset>
+        <fieldset className="timezone__ambiguity">
           <legend>请选择夏令时结束时刻</legend>
           {comparison.choices.map(choice => (
             <label key={choice.choice}>
@@ -195,7 +195,7 @@ export default function TimezoneTool() {
       )}
 
       {comparison.status === 'ready' && (
-        <div aria-label="时区转换结果">
+        <div className="timezone__results" aria-label="时区转换结果">
           {renderRow(comparison.rows[0])}
           {comparison.rows.slice(1).map((row, index) => renderRow(row, index + 1))}
           <button type="button" onClick={() => void copy(comparison.copyText)}>复制全部</button>

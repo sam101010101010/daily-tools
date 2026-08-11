@@ -2681,13 +2681,6 @@ main section .cron__explanation li {
 
 .timezone__targets {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.timezone__controls > div {
-  display: grid;
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) repeat(3, auto);
   gap: 0.5rem;
@@ -2695,13 +2688,13 @@ main section .cron__explanation li {
   min-width: 0;
 }
 
-.timezone__controls > div label {
+.timezone__targets label {
   grid-column: 1 / -1;
   width: auto;
   font-size: 0.85rem;
 }
 
-.timezone__controls > div select { min-width: 0; }
+.timezone__targets select { min-width: 0; }
 
 .timezone__controls button {
   margin: 0;
@@ -2713,8 +2706,7 @@ main section .cron__explanation li {
   justify-self: start;
 }
 
-.timezone__ambiguity,
-.timezone > fieldset {
+.timezone__ambiguity {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
@@ -2726,27 +2718,20 @@ main section .cron__explanation li {
   border-radius: var(--radius-sm);
 }
 
-.timezone > fieldset legend {
+.timezone__ambiguity legend {
   padding: 0 0.35rem;
   color: var(--accent-strong);
   font-weight: 700;
 }
 
-.timezone > fieldset label {
+.timezone__ambiguity label {
   width: auto;
   overflow-wrap: anywhere;
 }
 
-.timezone > fieldset input { accent-color: var(--accent); }
+.timezone__ambiguity input { accent-color: var(--accent); }
 
 .timezone__results {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: 0.8rem;
-  min-width: 0;
-}
-
-.timezone > [aria-label="时区转换结果"] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: 0.8rem;
@@ -2762,46 +2747,32 @@ main section .cron__explanation li {
   overflow-wrap: anywhere;
 }
 
-.timezone > [aria-label="时区转换结果"] > section {
-  min-width: 0;
-  padding: 0.85rem;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow-wrap: anywhere;
-}
-
-.timezone__card h2,
-.timezone > [aria-label="时区转换结果"] > section h2 {
+.timezone__card h2 {
   margin: 0 0 0.55rem;
   font-size: 1rem;
 }
 
-.timezone__card p,
-.timezone > [aria-label="时区转换结果"] > section p {
+.timezone__card p {
   margin: 0.25rem 0;
   overflow-wrap: anywhere;
 }
 
-.timezone__offset,
-.timezone > [aria-label="时区转换结果"] > section p:nth-of-type(3) {
+.timezone__offset {
   color: var(--text-muted);
   font-family: var(--mono);
 }
 
-.timezone__day-delta,
-.timezone > [aria-label="时区转换结果"] > section p:nth-of-type(4) {
+.timezone__day-delta {
   color: var(--accent-strong);
   font-weight: 650;
 }
 
-.timezone__card button,
-.timezone > [aria-label="时区转换结果"] > section button {
+.timezone__card button {
   width: 100%;
   margin: 0.65rem 0 0;
 }
 
-.timezone > [aria-label="时区转换结果"] > button {
+.timezone__results > button {
   grid-column: 1 / -1;
   justify-self: start;
   margin: 0;
@@ -2823,23 +2794,21 @@ main section .cron__explanation li {
     grid-template-columns: 1fr;
   }
 
-  .timezone__controls > div,
   .timezone__targets {
     grid-template-columns: 1fr;
   }
 
-  .timezone__controls > div label,
+  .timezone__targets label,
   .timezone__controls > button {
     grid-column: 1;
   }
 
   .timezone__controls button,
-  .timezone > [aria-label="时区转换结果"] > button {
+  .timezone__results > button {
     width: 100%;
   }
 
-  .timezone__results,
-  .timezone > [aria-label="时区转换结果"] {
+  .timezone__results {
     grid-template-columns: 1fr;
   }
 }
