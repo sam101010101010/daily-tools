@@ -274,3 +274,22 @@ test('certificate and CSR decoder is a unique browser-local registry tool with c
 
   await expect(certDecoder[0].load()).resolves.toHaveProperty('default');
 });
+
+test('timezone converter is a unique local registry tool with its discovery contract and lazy route module', async () => {
+  // Catches a missing central entry, metadata drift, an accidental backend,
+  // duplicate registration, or loss of the lazy-loaded tool boundary.
+  const timezone = registry.filter(tool => tool.id === 'timezone');
+
+  expect(timezone).toHaveLength(1);
+  expect(new Set(registry.map(tool => tool.id)).size).toBe(registry.length);
+  expect(timezone[0]).toMatchObject({
+    id: 'timezone',
+    name: '时区转换器',
+    description: '把一个源时区的本地时间同时转换到多个 IANA 时区，并明确处理夏令时歧义',
+    category: '日期时间',
+    keywords: ['时区', 'timezone', '世界时间', '会议', 'DST', '夏令时', 'IANA', 'UTC'],
+  });
+  expect(timezone[0]).not.toHaveProperty('backend');
+  expect(timezone[0]).not.toHaveProperty('icon');
+  await expect(timezone[0].load()).resolves.toHaveProperty('default');
+});

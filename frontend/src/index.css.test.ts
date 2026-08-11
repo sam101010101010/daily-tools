@@ -64,4 +64,19 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/\.text-tool__actions\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
     expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.text-tool__columns\s*\{[\s\S]*grid-template-columns:\s*1fr/);
   });
+
+  it('keeps timezone controls and result cards responsive with token surfaces and wrapping IANA ids', () => {
+    expect(css).toMatch(/\.timezone__controls\s*\{[^}]*display:\s*grid/);
+    expect(css).toMatch(/\.timezone__targets\s*\{[^}]*display:\s*grid/);
+    expect(css).toMatch(/\.timezone__ambiguity[^}]*var\(--accent-weak\)/);
+    expect(css).toMatch(/\.timezone__results\s*\{[^}]*repeat\(auto-fit, minmax\(min\(100%, 14rem\), 1fr\)\)/);
+    expect(css).toMatch(/\.timezone__card[^}]*var\(--surface-sunken\)/);
+    expect(css).toMatch(/\.timezone__offset[^}]*var\(--text-muted\)/);
+    expect(css).toMatch(/\.timezone__day-delta[^}]*var\(--accent-strong\)/);
+    expect(css).toMatch(/\.timezone__card[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/@media \(max-width: 640px\)\s*\{[\s\S]*\.timezone__controls[^}]*grid-template-columns:\s*1fr[\s\S]*\.timezone__results[^}]*grid-template-columns:\s*1fr/);
+    expect(css).not.toMatch(/\[aria-label=["']时区转换结果["']\]/);
+    expect(css).not.toMatch(/\.timezone\s*>\s*fieldset|\.timezone\s*>\s*\[[^\]]+\]\s*>\s*section/);
+    expect(css).not.toMatch(/p:nth-of-type/);
+  });
 });

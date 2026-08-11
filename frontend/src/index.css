@@ -2643,3 +2643,172 @@ main section .cron__explanation li {
 
   .cert-decoder__table--san { min-width: 20rem; }
 }
+
+/* ---- Local multi-zone timezone converter ------------------------------ */
+
+.timezone {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.timezone__controls {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr);
+  gap: 0.75rem 1rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.timezone__controls > label {
+  display: block;
+  width: auto;
+  font-size: 0.85rem;
+}
+
+.timezone__controls > input,
+.timezone__controls > select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.7rem 0.85rem;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: 0.95rem var(--mono);
+}
+
+.timezone__targets {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+  gap: 0.5rem;
+  align-items: end;
+  min-width: 0;
+}
+
+.timezone__targets label {
+  grid-column: 1 / -1;
+  width: auto;
+  font-size: 0.85rem;
+}
+
+.timezone__targets select { min-width: 0; }
+
+.timezone__controls button {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.timezone__controls > button {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.timezone__ambiguity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  color: var(--text);
+  background: var(--accent-weak);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+.timezone__ambiguity legend {
+  padding: 0 0.35rem;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.timezone__ambiguity label {
+  width: auto;
+  overflow-wrap: anywhere;
+}
+
+.timezone__ambiguity input { accent-color: var(--accent); }
+
+.timezone__results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.timezone__card {
+  min-width: 0;
+  padding: 0.85rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.timezone__card h2 {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+}
+
+.timezone__card p {
+  margin: 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.timezone__offset {
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.timezone__day-delta {
+  color: var(--accent-strong);
+  font-weight: 650;
+}
+
+.timezone__card button {
+  width: 100%;
+  margin: 0.65rem 0 0;
+}
+
+.timezone__results > button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: 0;
+}
+
+.timezone > [role="status"] {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 0.85rem;
+}
+
+.timezone :is(input, select, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .timezone__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .timezone__targets {
+    grid-template-columns: 1fr;
+  }
+
+  .timezone__targets label,
+  .timezone__controls > button {
+    grid-column: 1;
+  }
+
+  .timezone__controls button,
+  .timezone__results > button {
+    width: 100%;
+  }
+
+  .timezone__results {
+    grid-template-columns: 1fr;
+  }
+}
