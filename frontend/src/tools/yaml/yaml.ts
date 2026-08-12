@@ -40,6 +40,12 @@ const CORE_TAGS = new Set([
 
 type Failure = Extract<YamlToolResult, { kind: 'failure' }>;
 
+const JSON_CONVERSION = Symbol('json-conversion');
+
+type JsonConversion =
+  | { [JSON_CONVERSION]: 'success'; value: unknown }
+  | { [JSON_CONVERSION]: 'failure'; error: Failure };
+
 type AstInspection = {
   failure?: Failure;
   tagOffset?: number;
@@ -71,7 +77,11 @@ function childrenOf(node: Node): Node[] {
   return children;
 }
 
-function inspectAst(root: ParsedNode): AstInspection {
+function inspectAst(
+  root: ParsedNode,
+  anchors: Map<string, Node>,
+  aliasTargets: WeakMap<Node, Node>,
+): AstInspection {
   let nodes = 0;
   let losesYamlRepresentation = false;
   const stack: Array<{ node: Node; depth: number; root: boolean }> = [
@@ -114,6 +124,11 @@ function inspectAst(root: ParsedNode): AstInspection {
     if (node.comment || node.commentBefore || ('anchor' in node && node.anchor)) {
       losesYamlRepresentation = true;
     }
+    if (isAlias(node)) {
+      const target = anchors.get(node.source);
+      if (target) aliasTargets.set(node, target);
+    }
+    if ('anchor' in node && node.anchor) anchors.set(node.anchor, node);
     if (isAlias(node) || (isScalar(node) && node.type !== undefined && node.type !== 'PLAIN')) {
       losesYamlRepresentation = true;
     }
@@ -128,13 +143,13 @@ function inspectAst(root: ParsedNode): AstInspection {
   return { losesYamlRepresentation };
 }
 
-function hasAliasCycle(document: Document<ParsedNode>, root: Node): boolean {
+function hasAliasCycle(root: Node, aliasTargets: WeakMap<Node, Node>): boolean {
   const active = new Set<Node>();
   const complete = new Set<Node>();
 
   function visitNode(node: Node): boolean {
     if (isAlias(node)) {
-      const target = node.resolve(document);
+      const target = aliasTargets.get(node);
       return target ? visitNode(target) : false;
     }
     if (active.has(node)) return true;
@@ -150,6 +165,105 @@ function hasAliasCycle(document: Document<ParsedNode>, root: Node): boolean {
   }
 
   return visitNode(root);
+}
+
+function scalarSignature(value: unknown): string {
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) return 'number:NaN';
+    if (Object.is(value, -0)) return 'number:0';
+  }
+  return `${typeof value}:${String(value)}`;
+}
+
+function effectiveKeySignature(
+  node: Node,
+  aliasTargets: WeakMap<Node, Node>,
+  cache: WeakMap<Node, string>,
+  active: Set<Node>,
+): string | undefined {
+  const cached = cache.get(node);
+  if (cached !== undefined) return cached;
+  if (active.has(node)) return undefined;
+  active.add(node);
+
+  let signature: string | undefined;
+  if (isAlias(node)) {
+    const target = aliasTargets.get(node);
+    signature = target ? effectiveKeySignature(target, aliasTargets, cache, active) : undefined;
+  } else if (isScalar(node)) {
+    signature = JSON.stringify(['scalar', scalarSignature(node.value)]);
+  } else if (isSeq(node)) {
+    const items: string[] = [];
+    let complete = true;
+    for (const item of node.items) {
+      if (item === null) {
+        items.push('null');
+        continue;
+      }
+      const itemSignature = effectiveKeySignature(item as Node, aliasTargets, cache, active);
+      if (itemSignature === undefined) {
+        complete = false;
+        break;
+      }
+      items.push(itemSignature);
+    }
+    if (complete) signature = JSON.stringify(['sequence', ...items]);
+  } else if (isMap(node)) {
+    const entries: string[] = [];
+    let complete = true;
+    for (const pair of node.items) {
+      const keySignature = pair.key === null
+        ? 'null'
+        : effectiveKeySignature(pair.key as Node, aliasTargets, cache, active);
+      const valueSignature = pair.value === null
+        ? 'null'
+        : effectiveKeySignature(pair.value as Node, aliasTargets, cache, active);
+      if (keySignature === undefined || valueSignature === undefined) {
+        complete = false;
+        break;
+      }
+      entries.push(JSON.stringify([keySignature, valueSignature]));
+    }
+    if (complete) {
+      entries.sort();
+      signature = JSON.stringify(['mapping', ...entries]);
+    }
+  }
+
+  active.delete(node);
+  if (signature !== undefined) cache.set(node, signature);
+  return signature;
+}
+
+function duplicateEffectiveKey(
+  root: Node,
+  aliasTargets: WeakMap<Node, Node>,
+  lineCounter: LineCounter,
+): Failure | undefined {
+  const stack: Node[] = [root];
+  const cache = new WeakMap<Node, string>();
+
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node) break;
+
+    if (isMap(node)) {
+      const signatures = new Set<string>();
+      for (const pair of node.items) {
+        if (pair.key === null) continue;
+        const key = pair.key as Node;
+        const signature = effectiveKeySignature(key, aliasTargets, cache, new Set());
+        if (signature !== undefined && signatures.has(signature)) {
+          const position = lineColumn(lineCounter, key.range?.[0] ?? 0);
+          return failure('YAML 包含重复的映射键。', position.line, position.column);
+        }
+        if (signature !== undefined) signatures.add(signature);
+      }
+    }
+
+    stack.push(...childrenOf(node));
+  }
+  return undefined;
 }
 
 function lineColumn(lineCounter: LineCounter, offset: number): { line: number; column: number } {
@@ -187,38 +301,48 @@ function materialize(document: Document<ParsedNode>): unknown | Failure {
   }
 }
 
-function finiteJsonValue(value: unknown): unknown | Failure {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+function convertedJson(value: unknown): JsonConversion {
+  return { [JSON_CONVERSION]: 'success', value };
+}
+
+function rejectedJson(): JsonConversion {
+  return { [JSON_CONVERSION]: 'failure', error: failure(JSON_VALUE_FAILURE) };
+}
+
+function finiteJsonValue(value: unknown): JsonConversion {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return convertedJson(value);
+  }
   if (typeof value === 'bigint') {
     return value <= BigInt(Number.MAX_SAFE_INTEGER) && value >= BigInt(Number.MIN_SAFE_INTEGER)
-      ? Number(value)
-      : failure(JSON_VALUE_FAILURE);
+      ? convertedJson(Number(value))
+      : rejectedJson();
   }
   if (typeof value === 'number') {
     return Number.isFinite(value) && (!Number.isInteger(value) || Number.isSafeInteger(value))
-      ? value
-      : failure(JSON_VALUE_FAILURE);
+      ? convertedJson(value)
+      : rejectedJson();
   }
   if (Array.isArray(value)) {
     const result: unknown[] = [];
     for (const item of value) {
       const converted = finiteJsonValue(item);
-      if (isFailure(converted)) return converted;
-      result.push(converted);
+      if (converted[JSON_CONVERSION] === 'failure') return converted;
+      result.push(converted.value);
     }
-    return result;
+    return convertedJson(result);
   }
   if (value instanceof Map) {
     const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const [key, item] of value) {
-      if (typeof key !== 'string') return failure(JSON_VALUE_FAILURE);
+      if (typeof key !== 'string') return rejectedJson();
       const converted = finiteJsonValue(item);
-      if (isFailure(converted)) return converted;
-      result[key] = converted;
+      if (converted[JSON_CONVERSION] === 'failure') return converted;
+      result[key] = converted.value;
     }
-    return result;
+    return convertedJson(result);
   }
-  return failure(JSON_VALUE_FAILURE);
+  return rejectedJson();
 }
 
 function isFailure(value: unknown): value is Failure {
@@ -254,11 +378,19 @@ function parseYaml(input: string):
 
   const document = documents[0];
   if (!document || document.contents === null) return failure('请输入一个 YAML 文档。');
+  if (document.directives?.yaml.version !== '1.2') {
+    return failure('只支持 YAML 1.2 文档。', 1, 1);
+  }
 
   const parserFailure = yamlError(document, lineCounter);
   if (parserFailure) return parserFailure;
 
-  const inspection = inspectAst(document.contents);
+  const anchors = new Map<string, Node>();
+  const aliasTargets = new WeakMap<Node, Node>();
+  const inspection = inspectAst(document.contents, anchors, aliasTargets);
+  if (document.comment || document.commentBefore) {
+    inspection.losesYamlRepresentation = true;
+  }
   if (inspection.failure) {
     if (inspection.tagOffset !== undefined) {
       const position = lineCounter.linePos(inspection.tagOffset);
@@ -266,7 +398,9 @@ function parseYaml(input: string):
     }
     return inspection.failure;
   }
-  if (hasAliasCycle(document, document.contents)) return failure('YAML 不能包含循环引用。');
+  const duplicateKey = duplicateEffectiveKey(document.contents, aliasTargets, lineCounter);
+  if (duplicateKey) return duplicateKey;
+  if (hasAliasCycle(document.contents, aliasTargets)) return failure('YAML 不能包含循环引用。');
 
   return { document, inspection };
 }
@@ -275,7 +409,12 @@ function jsonErrorOffset(input: string): number | undefined {
   let index = 0;
 
   function whitespace(): void {
-    while (/\s/u.test(input[index] ?? '')) index += 1;
+    while (input[index] === ' '
+      || input[index] === '\t'
+      || input[index] === '\n'
+      || input[index] === '\r') {
+      index += 1;
+    }
   }
 
   function string(): boolean {
@@ -472,11 +611,11 @@ export function processYaml(request: YamlToolRequest): YamlToolResult {
   }
 
   const jsonValue = finiteJsonValue(materialized);
-  if (isFailure(jsonValue)) return jsonValue;
+  if (jsonValue[JSON_CONVERSION] === 'failure') return jsonValue.error;
 
   return {
     kind: 'success',
-    output: `${JSON.stringify(jsonValue, null, 2)}\n`,
+    output: `${JSON.stringify(jsonValue.value, null, 2)}\n`,
     warnings: parsed.inspection.losesYamlRepresentation ? [LOSSY_YAML_WARNING] : [],
   };
 }

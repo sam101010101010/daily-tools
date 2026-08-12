@@ -16,6 +16,23 @@ function wideSequence(count: number): string {
   return '- null\n'.repeat(count);
 }
 
+function wideAliasDocument(useAliases: boolean): string {
+  const item = useAliases ? '  - *source\n' : '  - value\n';
+  return `source: &source value\npadding:\n${'  - item\n'.repeat(9_800)}aliases:\n${item.repeat(100)}`;
+}
+
+function medianFormatDuration(input: string): number {
+  const durations = Array.from({ length: 3 }, () => {
+    const started = performance.now();
+    const result = processYaml({ mode: 'format-yaml', input });
+    const duration = performance.now() - started;
+    expect(result).toMatchObject({ kind: 'success' });
+    return duration;
+  });
+  durations.sort((left, right) => left - right);
+  return durations[1] ?? Number.POSITIVE_INFINITY;
+}
+
 const NESTED_ALIAS_FAN_OUT = [
   'seed: &seed value',
   'level1: &level1 [*seed, *seed, *seed]',
@@ -159,6 +176,39 @@ describe('YAML and JSON conversion contract', () => {
     });
   });
 
+  it('keeps a top-level user mapping named kind=failure as JSON data', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: 'kind: failure\nmessage: user data\n',
+    })).toEqual({
+      kind: 'success',
+      output: '{\n  "kind": "failure",\n  "message": "user data"\n}\n',
+      warnings: [],
+    });
+  });
+
+  it('keeps a nested user mapping named kind=failure instead of returning it as an adapter failure', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: 'payload:\n  kind: failure\n  message: nested user data\n',
+    })).toEqual({
+      kind: 'success',
+      output: '{\n  "payload": {\n    "kind": "failure",\n    "message": "nested user data"\n  }\n}\n',
+      warnings: [],
+    });
+  });
+
+  it('reports a trailing document comment that JSON cannot represent', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: 'value: plain\n# trailing document comment\n',
+    })).toEqual({
+      kind: 'success',
+      output: '{\n  "value": "plain"\n}\n',
+      warnings: [LOSSY_YAML_WARNING],
+    });
+  });
+
   it('rejects invalid JSON instead of accepting JavaScript extensions or trailing commas', () => {
     expect(processYaml({
       mode: 'json-to-yaml',
@@ -204,6 +254,61 @@ describe('single-document and schema safety contract', () => {
     });
   });
 
+  it('rejects structurally identical sequence keys before a Map can preserve both identities', () => {
+    expect(processYaml({
+      mode: 'format-yaml',
+      input: '? [left, right]\n: first\n? [left, right]\n: second\n',
+    })).toEqual({
+      kind: 'failure',
+      message: 'YAML 包含重复的映射键。',
+      line: 3,
+      column: 3,
+    });
+  });
+
+  it('rejects an alias-resolved string key duplicated by a later literal key', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: 'key: &key duplicate\n? *key\n: first\nduplicate: second\n',
+    })).toEqual({
+      kind: 'failure',
+      message: 'YAML 包含重复的映射键。',
+      line: 4,
+      column: 1,
+    });
+  });
+
+  it('resolves a duplicate alias key against the most recent preceding reused anchor', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: [
+        'first: &key one',
+        '? *key',
+        ': aliased',
+        'second: &key two',
+        'one: literal',
+        '',
+      ].join('\n'),
+    })).toEqual({
+      kind: 'failure',
+      message: 'YAML 包含重复的映射键。',
+      line: 5,
+      column: 1,
+    });
+  });
+
+  it('rejects an explicit YAML 1.1 directive instead of overriding Core 1.2 parsing', () => {
+    expect(processYaml({
+      mode: 'format-yaml',
+      input: '%YAML 1.1\n---\nlegacy: yes\n',
+    })).toEqual({
+      kind: 'failure',
+      message: '只支持 YAML 1.2 文档。',
+      line: 1,
+      column: 1,
+    });
+  });
+
   it.each([
     ['local tag', 'value: !env HOME\n'],
     ['explicit non-Core tag', 'created: !!timestamp 2026-08-12\n'],
@@ -232,6 +337,18 @@ describe('single-document and schema safety contract', () => {
 });
 
 describe('bounded resource contract', () => {
+  it('validates a hostile wide alias document without rescanning the full AST per alias', () => {
+    const plainInput = wideAliasDocument(false);
+    const aliasInput = wideAliasDocument(true);
+
+    processYaml({ mode: 'format-yaml', input: plainInput });
+    processYaml({ mode: 'format-yaml', input: aliasInput });
+    const plainDuration = medianFormatDuration(plainInput);
+    const aliasDuration = medianFormatDuration(aliasInput);
+
+    expect(aliasDuration).toBeLessThan((plainDuration * 1.6) + 5);
+  });
+
   it('accepts 10,000 sequence items at the inclusive AST node boundary', () => {
     expect(processYaml({
       mode: 'format-yaml',
@@ -332,6 +449,20 @@ describe('finite JSON representation contract', () => {
     expect(processYaml({ mode: 'yaml-to-json', input })).toEqual({
       kind: 'failure',
       message: 'YAML 包含无法无损表示为有限 JSON 的值。',
+    });
+  });
+});
+
+describe('JSON diagnostic contract', () => {
+  it.each([
+    ['NBSP after a legal newline', '\n\u00a0{"value": 1}', 2, 1],
+    ['leading BOM', '\uFEFF{"value": 1}', 1, 1],
+  ])('reports the exact invalid JSON coordinate for %s', (_label, input, line, column) => {
+    expect(processYaml({ mode: 'json-to-yaml', input })).toEqual({
+      kind: 'failure',
+      message: '请输入有效的 JSON。',
+      line,
+      column,
     });
   });
 });
