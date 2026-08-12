@@ -12,6 +12,16 @@ function aliasList(count: number): string {
   return `source: &source value\naliases:\n${'  - *source\n'.repeat(count)}`;
 }
 
+const NESTED_ALIAS_FAN_OUT = [
+  'seed: &seed value',
+  'level1: &level1 [*seed, *seed, *seed]',
+  'level2: &level2 [*level1, *level1, *level1]',
+  'level3: &level3 [*level2, *level2, *level2]',
+  'level4: &level4 [*level3, *level3, *level3]',
+  'output: *level4',
+  '',
+].join('\n');
+
 describe('format-yaml contract', () => {
   it('keeps YAML 1.2 scalar meanings instead of applying YAML 1.1 boolean coercion', () => {
     const result = processYaml({
@@ -235,17 +245,27 @@ describe('bounded resource contract', () => {
     });
   });
 
-  it('accepts alias expansion at the documented budget of 100', () => {
+  it('accepts 100 flat alias references at the inclusive safety boundary', () => {
     expect(processYaml({
       mode: 'yaml-to-json',
       input: aliasList(100),
     })).toMatchObject({ kind: 'success' });
   });
 
-  it('rejects an alias bomb beyond the documented expansion budget of 100', () => {
+  it('rejects 101 flat alias references beyond the inclusive safety boundary', () => {
     expect(processYaml({
       mode: 'yaml-to-json',
       input: aliasList(101),
+    })).toEqual({
+      kind: 'failure',
+      message: 'YAML 别名展开超过 100 的安全上限。',
+    });
+  });
+
+  it('rejects nested fan-out expansion even when the document has only 13 alias nodes', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: NESTED_ALIAS_FAN_OUT,
     })).toEqual({
       kind: 'failure',
       message: 'YAML 别名展开超过 100 的安全上限。',
@@ -269,6 +289,14 @@ describe('bounded resource contract', () => {
       kind: 'failure',
       message: '输入不能超过 2 MiB（按 UTF-8 计算）。',
     });
+  });
+
+  it('accepts valid YAML whose UTF-8 encoding is exactly 2 MiB', () => {
+    const wrapper = 'value: ""\n';
+    const input = `value: "${'a'.repeat(TWO_MIB - wrapper.length)}"\n`;
+
+    expect(new TextEncoder().encode(input)).toHaveLength(TWO_MIB);
+    expect(processYaml({ mode: 'format-yaml', input })).toMatchObject({ kind: 'success' });
   });
 });
 
