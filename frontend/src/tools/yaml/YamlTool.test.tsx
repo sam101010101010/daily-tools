@@ -250,6 +250,22 @@ test.each([
   }
 });
 
+test('ignores a pending copy completion after the workbench unmounts', async () => {
+  let resolveCopy!: (result: { ok: true }) => void;
+  const pendingCopy = new Promise<{ ok: true }>(resolve => { resolveCopy = resolve; });
+  const readOk = vi.fn(() => true);
+  const copyResult = Object.defineProperty({}, 'ok', { get: readOk }) as { ok: true };
+  mockedCopyText.mockReturnValueOnce(pendingCopy);
+  const { unmount } = render(<YamlTool />);
+  fireEvent.click(screen.getByRole('button', { name: '格式化 YAML' }));
+  fireEvent.click(screen.getByRole('button', { name: '复制输出' }));
+
+  unmount();
+  await act(async () => { resolveCopy(copyResult); });
+
+  expect(readOk).not.toHaveBeenCalled();
+});
+
 test.each([
   ['yaml-to-json', 'name: api\n', '转换为 JSON', '下载 JSON', 'daily-tools-yaml-output.json', 'application/json;charset=utf-8'],
   ['format-yaml', 'name: api\n', '格式化 YAML', '下载 YAML', 'daily-tools-yaml-output.yaml', 'application/yaml;charset=utf-8'],

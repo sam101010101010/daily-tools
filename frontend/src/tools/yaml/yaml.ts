@@ -333,6 +333,42 @@ function materialize(document: Document<ParsedNode>): unknown | Failure {
   }
 }
 
+function inspectMaterializedYamlValue(root: unknown): Failure | undefined {
+  let nodes = 0;
+  const stack: Array<{ value: unknown; depth: number; root: boolean }> = [
+    { value: root, depth: 0, root: true },
+  ];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) break;
+    const { value } = current;
+    const collection = Array.isArray(value) || value instanceof Map;
+    const depth = current.depth + (collection ? 1 : 0);
+
+    if (!current.root) {
+      nodes += 1;
+      if (nodes > MAX_NODES) return failure('输入节点过多（最多 10000 个）');
+    }
+    if (depth > MAX_DEPTH) return failure('YAML 嵌套不能超过 100 层。');
+
+    if (Array.isArray(value)) {
+      for (let index = value.length - 1; index >= 0; index -= 1) {
+        stack.push({ value: value[index], depth, root: false });
+      }
+    } else if (value instanceof Map) {
+      const entries = [...value.entries()];
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        const entry = entries[index];
+        if (!entry) continue;
+        stack.push({ value: entry[1], depth, root: false });
+        stack.push({ value: entry[0], depth, root: false });
+      }
+    }
+  }
+  return undefined;
+}
+
 function convertedJson(value: unknown): JsonConversion {
   return { [JSON_CONVERSION]: 'success', value };
 }
@@ -435,6 +471,8 @@ function parseYaml(input: string):
   const duplicateKey = duplicateEffectiveKey(document.contents, aliasTargets, lineCounter);
   if (duplicateKey) return duplicateKey;
   if (hasAliasCycle(document.contents, aliasTargets)) return failure('YAML 不能包含循环引用。');
+  const materializedFailure = inspectMaterializedYamlValue(materialized);
+  if (materializedFailure) return materializedFailure;
 
   return { document, inspection, materialized };
 }

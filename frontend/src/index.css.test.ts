@@ -91,5 +91,6 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/\.yaml-tool__actions\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
     expect(css).toMatch(/\.yaml-tool\s+:is\(select, textarea, button\):focus-visible\s*\{[^}]*var\(--accent\)/);
     expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.yaml-tool__panes\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.yaml-tool__mode select\s*\{[^}]*flex:\s*0 1 auto/);
   });
 });

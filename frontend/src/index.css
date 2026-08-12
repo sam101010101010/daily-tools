@@ -2921,7 +2921,10 @@ main section .yaml-tool__warnings li {
     flex-direction: column;
   }
 
-  .yaml-tool__mode select { width: 100%; }
+  .yaml-tool__mode select {
+    flex: 0 1 auto;
+    width: 100%;
+  }
 
   .yaml-tool__panes { grid-template-columns: 1fr; }
 

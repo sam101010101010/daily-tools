@@ -67,6 +67,7 @@ export default function YamlTool() {
     const activeDownloads = activeDownloadsRef.current;
     const downloadTimers = downloadTimersRef.current;
     return () => {
+      copyTokenRef.current += 1;
       downloadTimers.forEach(timer => clearTimeout(timer));
       downloadTimers.clear();
       activeDownloads.forEach(url => URL.revokeObjectURL(url));

@@ -12,6 +12,24 @@ function aliasList(count: number): string {
   return `source: &source value\naliases:\n${'  - *source\n'.repeat(count)}`;
 }
 
+function expandedAliasDepth(baseDepth: number, wrapperDepth: number): string {
+  const base = `${'['.repeat(baseDepth)}null${']'.repeat(baseDepth)}`;
+  const wrapper = `${'['.repeat(wrapperDepth)}*base${']'.repeat(wrapperDepth)}`;
+  return `base: &base ${base}\nwrapper: ${wrapper}\n`;
+}
+
+function expandedAliasKeyDepth(baseDepth: number, wrapperDepth: number): string {
+  const base = `${'['.repeat(baseDepth)}null${']'.repeat(baseDepth)}`;
+  const key = `${'['.repeat(wrapperDepth)}*base${']'.repeat(wrapperDepth)}`;
+  return `base: &base ${base}\n? ${key}\n: value\n`;
+}
+
+function expandedAliasNodes(aliasCount: number): string {
+  const base = `[${Array.from({ length: 100 }, () => 'null').join(',')}]`;
+  const aliases = Array.from({ length: aliasCount }, () => '*base').join(',');
+  return `- &base ${base}\n- [${aliases}]\n`;
+}
+
 function wideSequence(count: number): string {
   return '- null\n'.repeat(count);
 }
@@ -370,6 +388,53 @@ describe('bounded resource contract', () => {
     })).toEqual({
       kind: 'failure',
       message: 'YAML 嵌套不能超过 100 层。',
+    });
+  });
+
+  it('accepts alias-expanded YAML at the inclusive 100-level materialized boundary', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: expandedAliasDepth(50, 49),
+    })).toMatchObject({ kind: 'success' });
+  });
+
+  it('rejects alias-expanded YAML at 101 materialized levels', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: expandedAliasDepth(50, 50),
+    })).toEqual({
+      kind: 'failure',
+      message: 'YAML 嵌套不能超过 100 层。',
+    });
+  });
+
+  it.each(['format-yaml', 'yaml-to-json'] as const)(
+    'rejects alias-expanded mapping keys at 101 materialized levels in %s',
+    mode => {
+      expect(processYaml({
+        mode,
+        input: expandedAliasKeyDepth(50, 50),
+      })).toEqual({
+        kind: 'failure',
+        message: 'YAML 嵌套不能超过 100 层。',
+      });
+    },
+  );
+
+  it('accepts 10,000 alias-expanded materialized nodes at the inclusive boundary', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: expandedAliasNodes(98),
+    })).toMatchObject({ kind: 'success' });
+  });
+
+  it('rejects the 10,001st alias-expanded materialized node', () => {
+    expect(processYaml({
+      mode: 'yaml-to-json',
+      input: expandedAliasNodes(99),
+    })).toEqual({
+      kind: 'failure',
+      message: '输入节点过多（最多 10000 个）',
     });
   });
 
