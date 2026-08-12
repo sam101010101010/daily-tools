@@ -57,7 +57,7 @@ export default function YamlTool() {
   const [diagnostic, setDiagnostic] = useState<Diagnostic>();
   const [status, setStatus] = useState('');
   const [copyError, setCopyError] = useState('');
-  const revisionRef = useRef(0);
+  const copyTokenRef = useRef(0);
   const activeDownloadsRef = useRef(new Set<string>());
   const downloadTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const details = MODE_DETAILS[mode];
@@ -74,7 +74,7 @@ export default function YamlTool() {
   }, []);
 
   function clearDerivedState() {
-    revisionRef.current += 1;
+    copyTokenRef.current += 1;
     setOutput('');
     setWarnings([]);
     setDiagnostic(undefined);
@@ -106,11 +106,12 @@ export default function YamlTool() {
 
   async function copyOutput() {
     if (!output) return;
-    const revision = revisionRef.current;
+    const copyToken = copyTokenRef.current + 1;
+    copyTokenRef.current = copyToken;
     setStatus('');
     setCopyError('');
     const result = await copyText(output);
-    if (revisionRef.current !== revision) return;
+    if (copyTokenRef.current !== copyToken) return;
     if (result.ok) setStatus('已复制输出');
     else setCopyError(result.message);
   }
@@ -131,9 +132,13 @@ export default function YamlTool() {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = details.filename;
-    anchor.click();
     const timer = setTimeout(() => releaseDownload(url), 0);
     downloadTimersRef.current.set(url, timer);
+    try {
+      anchor.click();
+    } catch {
+      releaseDownload(url);
+    }
   }
 
   return (
@@ -184,10 +189,11 @@ export default function YamlTool() {
       </div>
       {diagnostic && (
         <div className="yaml-workbench__diagnostic">
-          <ErrorView message={diagnostic.message} />
-          {diagnostic.line !== undefined && diagnostic.column !== undefined && (
-            <p>第 {diagnostic.line} 行，第 {diagnostic.column} 列</p>
-          )}
+          <ErrorView message={`${diagnostic.message}${
+            diagnostic.line !== undefined && diagnostic.column !== undefined
+              ? `第 ${diagnostic.line} 行，第 ${diagnostic.column} 列`
+              : ''
+          }`} />
         </div>
       )}
       {warnings.length > 0 && (

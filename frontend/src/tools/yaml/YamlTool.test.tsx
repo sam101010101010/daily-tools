@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { copyText } from '../../lib/copy';
@@ -8,6 +8,15 @@ import YamlTool from './YamlTool';
 vi.mock('../../lib/copy', () => ({ copyText: vi.fn() }));
 
 const mockedCopyText = vi.mocked(copyText);
+
+function readBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result)));
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.readAsText(blob);
+  });
+}
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn());
@@ -131,8 +140,7 @@ test('keeps invalid JSON source and presents its accessible line and column diag
   await user.click(screen.getByRole('button', { name: '转换为 YAML' }));
 
   expect(source).toHaveValue('{"value": NaN,}');
-  expect(screen.getByRole('alert')).toHaveTextContent('请输入有效的 JSON。');
-  expect(screen.getByText('第 1 行，第 11 列')).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('请输入有效的 JSON。第 1 行，第 11 列');
   expect(screen.getByLabelText('YAML 输出')).toHaveValue('');
 
   fireEvent.change(source, { target: { value: '{"value": 1}' } });
@@ -160,6 +168,45 @@ test('copies successful current output and announces clipboard success or failur
 });
 
 test.each([
+  [
+    { ok: false as const, message: '较早的复制失败。' },
+    { ok: true as const },
+    '已复制输出',
+  ],
+  [
+    { ok: true as const },
+    { ok: false as const, message: '较新的复制失败。' },
+    '较新的复制失败。',
+  ],
+])('keeps the latest copy result when earlier copy completion arrives last', async (
+  firstResult, secondResult, expected,
+) => {
+  const user = userEvent.setup();
+  let resolveFirst!: (result: typeof firstResult) => void;
+  let resolveSecond!: (result: typeof secondResult) => void;
+  mockedCopyText
+    .mockReturnValueOnce(new Promise(resolve => { resolveFirst = resolve; }))
+    .mockReturnValueOnce(new Promise(resolve => { resolveSecond = resolve; }));
+  render(<YamlTool />);
+  await user.click(screen.getByRole('button', { name: '格式化 YAML' }));
+
+  await user.click(screen.getByRole('button', { name: '复制输出' }));
+  await user.click(screen.getByRole('button', { name: '复制输出' }));
+  expect(mockedCopyText).toHaveBeenCalledTimes(2);
+
+  await act(async () => { resolveSecond(secondResult); });
+  await act(async () => { resolveFirst(firstResult); });
+
+  if (secondResult.ok) {
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  } else {
+    expect(screen.getByRole('alert')).toHaveTextContent(expected);
+    expect(screen.queryByText('已复制输出')).not.toBeInTheDocument();
+  }
+});
+
+test.each([
   ['yaml-to-json', 'name: api\n', '转换为 JSON', '下载 JSON', 'daily-tools-yaml-output.json', 'application/json;charset=utf-8'],
   ['format-yaml', 'name: api\n', '格式化 YAML', '下载 YAML', 'daily-tools-yaml-output.yaml', 'application/yaml;charset=utf-8'],
   ['json-to-yaml', '{"name":"api"}', '转换为 YAML', '下载 YAML', 'daily-tools-yaml-output.yaml', 'application/yaml;charset=utf-8'],
@@ -184,9 +231,14 @@ test.each([
   fireEvent.click(screen.getByRole('button', { name: downloadLabel }));
 
   expect(createObjectUrl).toHaveBeenCalledWith(expect.objectContaining({ type: mimeType }));
+  const blobText = readBlobText(createObjectUrl.mock.calls[0][0] as Blob);
+  const output = screen.getByLabelText(mode === 'yaml-to-json' ? 'JSON 输出' : mode === 'json-to-yaml'
+    ? 'YAML 输出'
+    : '格式化后的 YAML') as HTMLTextAreaElement;
   expect(clicks).toEqual([{ href: 'blob:yaml-output', download: filename }]);
   expect(revokeObjectUrl).not.toHaveBeenCalled();
-  vi.runOnlyPendingTimers();
+  await vi.runAllTimersAsync();
+  await expect(blobText).resolves.toBe(output.value);
   expect(revokeObjectUrl).toHaveBeenCalledWith('blob:yaml-output');
 });
 
@@ -202,4 +254,20 @@ test('reclaims a deferred output download on unmount', async () => {
   unmount();
 
   expect(revokeObjectUrl).toHaveBeenCalledWith('blob:outstanding-yaml');
+});
+
+test('reclaims a download when the anchor click throws', () => {
+  vi.useFakeTimers();
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:failed-click-yaml');
+  const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
+    throw new Error('download click failed');
+  });
+  render(<YamlTool />);
+
+  fireEvent.click(screen.getByRole('button', { name: '格式化 YAML' }));
+  fireEvent.click(screen.getByRole('button', { name: '下载 YAML' }));
+  vi.runOnlyPendingTimers();
+
+  expect(revokeObjectUrl).toHaveBeenCalledWith('blob:failed-click-yaml');
 });
