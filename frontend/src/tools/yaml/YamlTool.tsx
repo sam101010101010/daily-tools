@@ -4,6 +4,7 @@ import { copyText } from '../../lib/copy';
 import { processYaml, type YamlToolMode } from './yaml';
 
 const DEFAULT_SOURCE = 'service:\n  name: example-api\n  enabled: true\n';
+const WARNINGS_ID = 'yaml-conversion-warnings';
 
 const MODE_DETAILS: Record<YamlToolMode, {
   label: string;
@@ -142,7 +143,7 @@ export default function YamlTool() {
   }
 
   return (
-    <section className="yaml-tool" aria-label="YAML 与 JSON 工作台">
+    <div className="yaml-tool" role="region" aria-label="YAML 与 JSON 工作台">
       <p className="yaml-tool__privacy">所有内容仅在当前浏览器本地处理，不会上传。</p>
       <div className="yaml-tool__mode">
         <label htmlFor="yaml-mode">处理方式</label>
@@ -197,12 +198,27 @@ export default function YamlTool() {
         </div>
       )}
       {warnings.length > 0 && (
-        <ul className="yaml-tool__warnings" aria-label="转换提示">
+        <ul
+          id={WARNINGS_ID}
+          className="yaml-tool__warnings"
+          aria-label="转换提示"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {warnings.map(warning => <li key={warning}>{warning}</li>)}
         </ul>
       )}
       {copyError && <ErrorView message={copyError} />}
-      {status && <p className="yaml-tool__status" role="status" aria-live="polite">{status}</p>}
-    </section>
+      {status && (
+        <p
+          className="yaml-tool__status"
+          role="status"
+          aria-live="polite"
+          aria-describedby={warnings.length > 0 ? WARNINGS_ID : undefined}
+        >
+          {status}
+        </p>
+      )}
+    </div>
   );
 }

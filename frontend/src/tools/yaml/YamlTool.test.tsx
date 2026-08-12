@@ -56,6 +56,31 @@ test('starts with a safe public YAML example and exposes the format workflow wit
   expect(cookieSetter).not.toHaveBeenCalled();
 });
 
+test('applies the generic tool card only to the YAML root, not its control and feedback groups', async () => {
+  const user = userEvent.setup();
+  const { container } = render(
+    <main>
+      <section>
+        <YamlTool />
+      </section>
+    </main>,
+  );
+  await user.selectOptions(screen.getByLabelText('处理方式'), 'json-to-yaml');
+  fireEvent.change(screen.getByLabelText('JSON 输入'), { target: { value: '{bad' } });
+  await user.click(screen.getByRole('button', { name: '转换为 YAML' }));
+
+  const genericCardSelector = 'main section > div:not(.tool-grid)';
+  expect(container.querySelector('.yaml-tool')?.matches(genericCardSelector)).toBe(true);
+  for (const selector of [
+    '.yaml-tool__mode',
+    '.yaml-tool__panes',
+    '.yaml-tool__actions',
+    '.yaml-tool__diagnostic',
+  ]) {
+    expect(container.querySelector(selector)?.matches(genericCardSelector)).toBe(false);
+  }
+});
+
 test.each([
   {
     mode: 'format-yaml',
@@ -128,6 +153,25 @@ test('clears stale output, warnings, diagnostics and copy status synchronously w
   expect(screen.getByLabelText('JSON 输入')).toHaveValue('name: changed\n');
   expect(screen.getByLabelText('YAML 输出')).toHaveValue('');
   expect(screen.queryByText('处理完成')).not.toBeInTheDocument();
+});
+
+test('announces lossy conversion politely as a list associated with completion status', async () => {
+  const user = userEvent.setup();
+  render(<YamlTool />);
+  await user.selectOptions(screen.getByLabelText('处理方式'), 'yaml-to-json');
+  fireEvent.change(screen.getByLabelText('YAML 输入'), {
+    target: { value: '# note\nname: api\n' },
+  });
+  await user.click(screen.getByRole('button', { name: '转换为 JSON' }));
+
+  const warning = screen.getByRole('list', { name: '转换提示' });
+  const status = screen.getByRole('status');
+  expect(warning).toHaveAttribute('aria-live', 'polite');
+  expect(warning).toHaveAttribute('aria-atomic', 'true');
+  expect(warning).toHaveTextContent('YAML 转换为 JSON 会省略注释、锚点和标量样式。');
+  expect(status).toHaveAttribute('aria-describedby', warning.id);
+  expect(status).toHaveTextContent('处理完成');
+  expect(status).not.toHaveTextContent('YAML 转换为 JSON 会省略注释、锚点和标量样式。');
 });
 
 test('keeps invalid JSON source and presents its accessible line and column diagnostic', async () => {
