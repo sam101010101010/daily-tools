@@ -142,9 +142,9 @@ export default function YamlTool() {
   }
 
   return (
-    <section className="yaml-workbench" aria-label="YAML 与 JSON 工作台">
-      <p className="yaml-workbench__privacy">所有内容仅在当前浏览器本地处理，不会上传。</p>
-      <div className="yaml-workbench__mode">
+    <section className="yaml-tool" aria-label="YAML 与 JSON 工作台">
+      <p className="yaml-tool__privacy">所有内容仅在当前浏览器本地处理，不会上传。</p>
+      <div className="yaml-tool__mode">
         <label htmlFor="yaml-mode">处理方式</label>
         <select
           id="yaml-mode"
@@ -156,8 +156,8 @@ export default function YamlTool() {
           ))}
         </select>
       </div>
-      <div className="yaml-workbench__panes">
-        <div className="yaml-workbench__pane">
+      <div className="yaml-tool__panes">
+        <div className="yaml-tool__pane">
           <label htmlFor="yaml-source">{details.sourceLabel}</label>
           <textarea
             id="yaml-source"
@@ -167,7 +167,7 @@ export default function YamlTool() {
             onChange={event => changeSource(event.target.value)}
           />
         </div>
-        <div className="yaml-workbench__pane">
+        <div className="yaml-tool__pane">
           <label htmlFor="yaml-output">{details.outputLabel}</label>
           <textarea
             id="yaml-output"
@@ -178,7 +178,7 @@ export default function YamlTool() {
           />
         </div>
       </div>
-      <div className="yaml-workbench__actions">
+      <div className="yaml-tool__actions">
         <button type="button" onClick={process}>{details.actionLabel}</button>
         {output && (
           <>
@@ -188,7 +188,7 @@ export default function YamlTool() {
         )}
       </div>
       {diagnostic && (
-        <div className="yaml-workbench__diagnostic">
+        <div className="yaml-tool__diagnostic">
           <ErrorView message={`${diagnostic.message}${
             diagnostic.line !== undefined && diagnostic.column !== undefined
               ? `第 ${diagnostic.line} 行，第 ${diagnostic.column} 列`
@@ -197,12 +197,12 @@ export default function YamlTool() {
         </div>
       )}
       {warnings.length > 0 && (
-        <ul className="yaml-workbench__warnings" aria-label="转换提示">
+        <ul className="yaml-tool__warnings" aria-label="转换提示">
           {warnings.map(warning => <li key={warning}>{warning}</li>)}
         </ul>
       )}
       {copyError && <ErrorView message={copyError} />}
-      {status && <p className="yaml-workbench__status" role="status" aria-live="polite">{status}</p>}
+      {status && <p className="yaml-tool__status" role="status" aria-live="polite">{status}</p>}
     </section>
   );
 }

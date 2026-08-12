@@ -293,3 +293,27 @@ test('timezone converter is a unique local registry tool with its discovery cont
   expect(timezone[0]).not.toHaveProperty('icon');
   await expect(timezone[0].load()).resolves.toHaveProperty('default');
 });
+
+test('YAML / JSON workbench is one browser-local registry tool searchable by its formatting and conversion terms', async () => {
+  // Catches a missing/duplicate central entry, discovery-copy drift, accidental
+  // backend/icon wiring, or loss of the lazy-loaded route-module boundary.
+  const yaml = registry.filter(tool => tool.id === 'yaml');
+
+  expect(yaml).toHaveLength(1);
+  expect(new Set(registry.map(tool => tool.id)).size).toBe(registry.length);
+  expect(yaml[0]).toMatchObject({
+    id: 'yaml',
+    name: 'YAML / JSON 工作台',
+    description: '在浏览器本地格式化并转换 YAML 与 JSON，不上传内容',
+    category: '格式化',
+    keywords: ['YAML', 'JSON', '格式化', '转换', '校验'],
+  });
+  expect(yaml[0]).not.toHaveProperty('backend');
+  expect(yaml[0]).not.toHaveProperty('icon');
+
+  for (const query of ['yaml', 'JSON', '格式化', '转换', '校验']) {
+    expect(searchTools(registry, query).map(tool => tool.id)).toContain('yaml');
+  }
+
+  await expect(yaml[0].load()).resolves.toHaveProperty('default');
+});

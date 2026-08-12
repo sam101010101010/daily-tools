@@ -79,4 +79,17 @@ describe('design tokens are the single source of truth', () => {
     expect(css).not.toMatch(/\.timezone\s*>\s*fieldset|\.timezone\s*>\s*\[[^\]]+\]\s*>\s*section/);
     expect(css).not.toMatch(/p:nth-of-type/);
   });
+
+  it('gives the YAML workbench equal fixed panes, token-scoped feedback, wrapping controls, and a 390px stack', () => {
+    expect(css).toMatch(/\.yaml-tool__mode\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.yaml-tool__panes\s*\{[^}]*display:\s*grid[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.yaml-tool__pane\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/);
+    expect(css).toMatch(/\.yaml-tool__pane textarea\s*\{[^}]*height:\s*20rem[^}]*min-height:\s*20rem[^}]*max-height:\s*20rem[^}]*overflow:\s*auto/);
+    expect(css).toMatch(/\.yaml-tool__privacy\s*\{[^}]*var\(--surface-sunken\)[^}]*var\(--border\)/);
+    expect(css).toMatch(/\.yaml-tool__warnings\s*\{[^}]*var\(--accent-weak\)[^}]*var\(--accent\)/);
+    expect(css).toMatch(/\.yaml-tool__status\s*\{[^}]*var\(--accent-strong\)/);
+    expect(css).toMatch(/\.yaml-tool__actions\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.yaml-tool\s+:is\(select, textarea, button\):focus-visible\s*\{[^}]*var\(--accent\)/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.yaml-tool__panes\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+  });
 });
