@@ -12,6 +12,10 @@ function aliasList(count: number): string {
   return `source: &source value\naliases:\n${'  - *source\n'.repeat(count)}`;
 }
 
+function wideSequence(count: number): string {
+  return '- null\n'.repeat(count);
+}
+
 const NESTED_ALIAS_FAN_OUT = [
   'seed: &seed value',
   'level1: &level1 [*seed, *seed, *seed]',
@@ -228,6 +232,23 @@ describe('single-document and schema safety contract', () => {
 });
 
 describe('bounded resource contract', () => {
+  it('accepts 10,000 sequence items at the inclusive AST node boundary', () => {
+    expect(processYaml({
+      mode: 'format-yaml',
+      input: wideSequence(10_000),
+    })).toMatchObject({ kind: 'success' });
+  });
+
+  it('rejects the 10,001st sequence item before serialization', () => {
+    expect(processYaml({
+      mode: 'format-yaml',
+      input: wideSequence(10_001),
+    })).toEqual({
+      kind: 'failure',
+      message: '输入节点过多（最多 10000 个）',
+    });
+  });
+
   it('accepts a document at the 100-level nesting boundary', () => {
     expect(processYaml({
       mode: 'yaml-to-json',
