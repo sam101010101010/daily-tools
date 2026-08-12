@@ -175,64 +175,95 @@ function scalarSignature(value: unknown): string {
   return `${typeof value}:${String(value)}`;
 }
 
-function effectiveKeySignature(
+type StructuralInterner = {
+  identities: Map<string, number>;
+  nextIdentity: number;
+};
+
+function internIdentity(interner: StructuralInterner, structure: string): number {
+  const existing = interner.identities.get(structure);
+  if (existing !== undefined) return existing;
+  const identity = interner.nextIdentity;
+  interner.nextIdentity += 1;
+  interner.identities.set(structure, identity);
+  return identity;
+}
+
+function effectiveKeyIdentity(
   node: Node,
   aliasTargets: WeakMap<Node, Node>,
-  cache: WeakMap<Node, string>,
+  cache: WeakMap<Node, number>,
   active: Set<Node>,
-): string | undefined {
+  interner: StructuralInterner,
+): number | undefined {
   const cached = cache.get(node);
   if (cached !== undefined) return cached;
   if (active.has(node)) return undefined;
   active.add(node);
 
-  let signature: string | undefined;
+  let identity: number | undefined;
   if (isAlias(node)) {
     const target = aliasTargets.get(node);
-    signature = target ? effectiveKeySignature(target, aliasTargets, cache, active) : undefined;
+    identity = target
+      ? effectiveKeyIdentity(target, aliasTargets, cache, active, interner)
+      : undefined;
   } else if (isScalar(node)) {
-    signature = JSON.stringify(['scalar', scalarSignature(node.value)]);
+    identity = internIdentity(
+      interner,
+      JSON.stringify(['scalar', scalarSignature(node.value)]),
+    );
   } else if (isSeq(node)) {
-    const items: string[] = [];
+    const items: number[] = [];
     let complete = true;
     for (const item of node.items) {
       if (item === null) {
-        items.push('null');
+        items.push(internIdentity(interner, 'missing'));
         continue;
       }
-      const itemSignature = effectiveKeySignature(item as Node, aliasTargets, cache, active);
-      if (itemSignature === undefined) {
+      const itemIdentity = effectiveKeyIdentity(
+        item as Node,
+        aliasTargets,
+        cache,
+        active,
+        interner,
+      );
+      if (itemIdentity === undefined) {
         complete = false;
         break;
       }
-      items.push(itemSignature);
+      items.push(itemIdentity);
     }
-    if (complete) signature = JSON.stringify(['sequence', ...items]);
+    if (complete) identity = internIdentity(interner, `sequence:${items.join(',')}`);
   } else if (isMap(node)) {
-    const entries: string[] = [];
+    const entries: Array<[number, number]> = [];
     let complete = true;
     for (const pair of node.items) {
-      const keySignature = pair.key === null
-        ? 'null'
-        : effectiveKeySignature(pair.key as Node, aliasTargets, cache, active);
-      const valueSignature = pair.value === null
-        ? 'null'
-        : effectiveKeySignature(pair.value as Node, aliasTargets, cache, active);
-      if (keySignature === undefined || valueSignature === undefined) {
+      const keyIdentity = pair.key === null
+        ? internIdentity(interner, 'missing')
+        : effectiveKeyIdentity(pair.key as Node, aliasTargets, cache, active, interner);
+      const valueIdentity = pair.value === null
+        ? internIdentity(interner, 'missing')
+        : effectiveKeyIdentity(pair.value as Node, aliasTargets, cache, active, interner);
+      if (keyIdentity === undefined || valueIdentity === undefined) {
         complete = false;
         break;
       }
-      entries.push(JSON.stringify([keySignature, valueSignature]));
+      entries.push([keyIdentity, valueIdentity]);
     }
     if (complete) {
-      entries.sort();
-      signature = JSON.stringify(['mapping', ...entries]);
+      entries.sort(([leftKey, leftValue], [rightKey, rightValue]) => (
+        leftKey - rightKey || leftValue - rightValue
+      ));
+      identity = internIdentity(
+        interner,
+        `mapping:${entries.map(([key, value]) => `${key}:${value}`).join(',')}`,
+      );
     }
   }
 
   active.delete(node);
-  if (signature !== undefined) cache.set(node, signature);
-  return signature;
+  if (identity !== undefined) cache.set(node, identity);
+  return identity;
 }
 
 function duplicateEffectiveKey(
@@ -241,23 +272,24 @@ function duplicateEffectiveKey(
   lineCounter: LineCounter,
 ): Failure | undefined {
   const stack: Node[] = [root];
-  const cache = new WeakMap<Node, string>();
+  const cache = new WeakMap<Node, number>();
+  const interner: StructuralInterner = { identities: new Map(), nextIdentity: 0 };
 
   while (stack.length > 0) {
     const node = stack.pop();
     if (!node) break;
 
     if (isMap(node)) {
-      const signatures = new Set<string>();
+      const identities = new Set<number>();
       for (const pair of node.items) {
         if (pair.key === null) continue;
         const key = pair.key as Node;
-        const signature = effectiveKeySignature(key, aliasTargets, cache, new Set());
-        if (signature !== undefined && signatures.has(signature)) {
+        const identity = effectiveKeyIdentity(key, aliasTargets, cache, new Set(), interner);
+        if (identity !== undefined && identities.has(identity)) {
           const position = lineColumn(lineCounter, key.range?.[0] ?? 0);
           return failure('YAML 包含重复的映射键。', position.line, position.column);
         }
-        if (signature !== undefined) signatures.add(signature);
+        if (identity !== undefined) identities.add(identity);
       }
     }
 
@@ -350,7 +382,7 @@ function isFailure(value: unknown): value is Failure {
 }
 
 function parseYaml(input: string):
-  | { document: Document<ParsedNode>; inspection: AstInspection }
+  | { document: Document<ParsedNode>; inspection: AstInspection; materialized: unknown }
   | Failure {
   const lineCounter = new LineCounter();
   let documents: Document<ParsedNode>[];
@@ -398,11 +430,13 @@ function parseYaml(input: string):
     }
     return inspection.failure;
   }
+  const materialized = materialize(document);
+  if (isFailure(materialized)) return materialized;
   const duplicateKey = duplicateEffectiveKey(document.contents, aliasTargets, lineCounter);
   if (duplicateKey) return duplicateKey;
   if (hasAliasCycle(document.contents, aliasTargets)) return failure('YAML 不能包含循环引用。');
 
-  return { document, inspection };
+  return { document, inspection, materialized };
 }
 
 function jsonErrorOffset(input: string): number | undefined {
@@ -595,9 +629,6 @@ export function processYaml(request: YamlToolRequest): YamlToolResult {
   const parsed = parseYaml(request.input);
   if (isFailure(parsed)) return parsed;
 
-  const materialized = materialize(parsed.document);
-  if (isFailure(materialized)) return materialized;
-
   if (request.mode === 'format-yaml') {
     try {
       return {
@@ -610,7 +641,7 @@ export function processYaml(request: YamlToolRequest): YamlToolResult {
     }
   }
 
-  const jsonValue = finiteJsonValue(materialized);
+  const jsonValue = finiteJsonValue(parsed.materialized);
   if (jsonValue[JSON_CONVERSION] === 'failure') return jsonValue.error;
 
   return {

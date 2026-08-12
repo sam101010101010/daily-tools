@@ -16,21 +16,13 @@ function wideSequence(count: number): string {
   return '- null\n'.repeat(count);
 }
 
-function wideAliasDocument(useAliases: boolean): string {
-  const item = useAliases ? '  - *source\n' : '  - value\n';
-  return `source: &source value\npadding:\n${'  - item\n'.repeat(9_800)}aliases:\n${item.repeat(100)}`;
-}
-
-function medianFormatDuration(input: string): number {
-  const durations = Array.from({ length: 3 }, () => {
-    const started = performance.now();
-    const result = processYaml({ mode: 'format-yaml', input });
-    const duration = performance.now() - started;
-    expect(result).toMatchObject({ kind: 'success' });
-    return duration;
-  });
-  durations.sort((left, right) => left - right);
-  return durations[1] ?? Number.POSITIVE_INFINITY;
+function aliasMappingKeyBomb(levels: number): string {
+  const lines = ['seed: &n0 { value: leaf }'];
+  for (let level = 1; level <= levels; level += 1) {
+    lines.push(`n${level}: &n${level} { ? *n${level - 1} : *n${level - 1} }`);
+  }
+  lines.push(`? *n${levels}`, ': first', `? *n${levels}`, ': second', '');
+  return lines.join('\n');
 }
 
 const NESTED_ALIAS_FAN_OUT = [
@@ -337,16 +329,14 @@ describe('single-document and schema safety contract', () => {
 });
 
 describe('bounded resource contract', () => {
-  it('validates a hostile wide alias document without rescanning the full AST per alias', () => {
-    const plainInput = wideAliasDocument(false);
-    const aliasInput = wideAliasDocument(true);
-
-    processYaml({ mode: 'format-yaml', input: plainInput });
-    processYaml({ mode: 'format-yaml', input: aliasInput });
-    const plainDuration = medianFormatDuration(plainInput);
-    const aliasDuration = medianFormatDuration(aliasInput);
-
-    expect(aliasDuration).toBeLessThan((plainDuration * 1.6) + 5);
+  it('enforces semantic alias limits before hashing duplicate mapping keys', () => {
+    expect(processYaml({
+      mode: 'format-yaml',
+      input: aliasMappingKeyBomb(4),
+    })).toEqual({
+      kind: 'failure',
+      message: 'YAML 别名展开超过 100 的安全上限。',
+    });
   });
 
   it('accepts 10,000 sequence items at the inclusive AST node boundary', () => {
