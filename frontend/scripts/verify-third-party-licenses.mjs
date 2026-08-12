@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 const licensePath = 'third-party-licenses/qr-0.6.0-LICENSE-MIT.txt';
+const yamlLicensePath = 'third-party-licenses/yaml-2.9.0-LICENSE-ISC.txt';
 
 async function readArtifact(label, url) {
   try {
@@ -31,3 +32,25 @@ if (!deployed.equals(tracked)) {
 }
 
 console.log(`Verified ${licensePath} in the production distribution`);
+
+const yamlTracked = await readArtifact(
+  'Tracked yaml@2.9.0 ISC notice',
+  new URL(`../public/${yamlLicensePath}`, import.meta.url),
+);
+const yamlInstalled = await readArtifact(
+  'Installed yaml@2.9.0 ISC license',
+  new URL('../node_modules/yaml/LICENSE', import.meta.url),
+);
+const yamlDeployed = await readArtifact(
+  'Deployed yaml@2.9.0 ISC notice',
+  new URL(`../dist/${yamlLicensePath}`, import.meta.url),
+);
+
+if (!yamlTracked.equals(yamlInstalled)) {
+  throw new Error('Tracked yaml@2.9.0 ISC notice does not match node_modules/yaml/LICENSE');
+}
+if (!yamlDeployed.equals(yamlTracked)) {
+  throw new Error('Deployed yaml@2.9.0 ISC notice does not match the tracked public notice');
+}
+
+console.log(`Verified ${yamlLicensePath} in the production distribution`);
