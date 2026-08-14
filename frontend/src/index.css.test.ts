@@ -93,4 +93,18 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.yaml-tool__panes\s*\{[\s\S]*grid-template-columns:\s*1fr/);
     expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.yaml-tool__mode select\s*\{[^}]*flex:\s*0 1 auto/);
   });
+
+  it('keeps text diff token-scoped, whitespace-preserving, and horizontally contained at 390px', () => {
+    expect(css).toMatch(/\.diff__inputs\s*\{[^}]*display:\s*grid[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.diff__field textarea\s*\{[^}]*white-space:\s*pre-wrap/);
+    expect(css).toMatch(/main section \.diff > \.diff__result > \.diff__viewport\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto[^}]*var\(--border\)/);
+    expect(css).toMatch(/\.diff__rows--split\s*\{[^}]*min-width:\s*42rem/);
+    expect(css).toMatch(/\.diff__text\s*\{[^}]*white-space:\s*pre-wrap/);
+    expect(css).toMatch(/\.diff__row--insert[^}]*var\(--diff-add-bg\)/);
+    expect(css).toMatch(/\.diff__row--delete[^}]*var\(--diff-del-bg\)/);
+    expect(css).toMatch(/\.diff__row--replace[^}]*var\(--diff-change-bg\)/);
+    expect(css).toMatch(/\.diff__marker--insert[^}]*var\(--diff-add\)/);
+    expect(css).toMatch(/\.diff__marker--delete[^}]*var\(--diff-del\)/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.diff__inputs\s*\{[^}]*grid-template-columns:\s*1fr/);
+  });
 });

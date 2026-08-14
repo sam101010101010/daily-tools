@@ -317,3 +317,27 @@ test('YAML / JSON workbench is one browser-local registry tool searchable by its
 
   await expect(yaml[0].load()).resolves.toHaveProperty('default');
 });
+
+test('text diff is one browser-local registry tool with searchable discovery metadata and a lazy route module', async () => {
+  // Catches a missing/duplicate central entry, an accidental backend or icon,
+  // weakened discovery terms, and loss of the route-level lazy boundary.
+  const diff = registry.filter(tool => tool.id === 'diff');
+
+  expect(diff).toHaveLength(1);
+  expect(new Set(registry.map(tool => tool.id)).size).toBe(registry.length);
+  expect(diff[0]).toMatchObject({
+    id: 'diff',
+    name: '文本差异对比',
+    description: '在浏览器本地逐行比较两段文本，查看统一或并排差异',
+    category: '文本',
+    keywords: ['diff', '文本对比', '差异', '比较', '逐行', '统一差异', '并排'],
+  });
+  expect(diff[0]).not.toHaveProperty('backend');
+  expect(diff[0]).not.toHaveProperty('icon');
+
+  for (const query of ['diff', '文本对比', '差异', '逐行', '统一差异', '并排']) {
+    expect(searchTools(registry, query).map(tool => tool.id)).toContain('diff');
+  }
+
+  await expect(diff[0].load()).resolves.toHaveProperty('default');
+});
