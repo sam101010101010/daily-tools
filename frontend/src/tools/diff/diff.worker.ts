@@ -90,23 +90,26 @@ function remainingEngineTime(deadline: number): number {
   return Math.max(0, deadline - Date.now());
 }
 
+function requireEngineTime(deadline: number): number {
+  const remaining = remainingEngineTime(deadline);
+  if (remaining === 0) throw new DiffComputationError('DIFF_TOO_COMPLEX');
+  return remaining;
+}
+
 function refineChangedText(
   leftText: string,
   rightText: string,
   segmenter: Intl.Segmenter,
   deadline: number,
 ): InlineDiff {
-  if (remainingEngineTime(deadline) === 0) return wholeChangeInline(leftText, rightText);
+  requireEngineTime(deadline);
 
   const leftGraphemes = Array.from(segmenter.segment(leftText), ({ segment }) => segment);
   const rightGraphemes = Array.from(segmenter.segment(rightText), ({ segment }) => segment);
-  const timeout = remainingEngineTime(deadline);
-  if (timeout === 0) return wholeChangeInline(leftText, rightText);
+  const timeout = requireEngineTime(deadline);
   const changes = diffArrays(leftGraphemes, rightGraphemes, { timeout });
 
-  if (changes === undefined) {
-    return wholeChangeInline(leftText, rightText);
-  }
+  if (changes === undefined) throw new DiffComputationError('DIFF_TOO_COMPLEX');
 
   const left: InlineSegment[] = [];
   const right: InlineSegment[] = [];
@@ -130,17 +133,16 @@ function createInlineDiff(
   deadline: number,
 ): InlineDiff | undefined {
   if (leftText === rightText) return undefined;
+  requireEngineTime(deadline);
   if (typeof Intl.Segmenter !== 'function') return wholeChangeInline(leftText, rightText);
-  if (remainingEngineTime(deadline) === 0) return wholeChangeInline(leftText, rightText);
 
   const wordSegmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
   const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   const leftWords = Array.from(wordSegmenter.segment(leftText), ({ segment }) => segment);
   const rightWords = Array.from(wordSegmenter.segment(rightText), ({ segment }) => segment);
-  const timeout = remainingEngineTime(deadline);
-  if (timeout === 0) return wholeChangeInline(leftText, rightText);
+  const timeout = requireEngineTime(deadline);
   const changes = diffArrays(leftWords, rightWords, { timeout });
-  if (changes === undefined) return wholeChangeInline(leftText, rightText);
+  if (changes === undefined) throw new DiffComputationError('DIFF_TOO_COMPLEX');
 
   const left: InlineSegment[] = [];
   const right: InlineSegment[] = [];
@@ -365,8 +367,7 @@ export function computeTextDiff(request: DiffRequest): DiffResult {
   const rightLines = prepareLines(request.right, request);
   const leftEngineInput = engineInput(leftLines);
   const rightEngineInput = engineInput(rightLines);
-  const timeout = remainingEngineTime(deadline);
-  if (timeout === 0) throw new DiffComputationError('DIFF_TOO_COMPLEX');
+  const timeout = requireEngineTime(deadline);
   const changes = diffLines(leftEngineInput, rightEngineInput, {
     newlineIsToken: true,
     timeout,
@@ -374,12 +375,16 @@ export function computeTextDiff(request: DiffRequest): DiffResult {
   if (changes === undefined) throw new DiffComputationError('DIFF_TOO_COMPLEX');
 
   const rows = buildRows(changes, leftLines, rightLines, deadline);
+  requireEngineTime(deadline);
   const hunks = createHunks(rows);
+  const summary = summarize(rows);
+  const unifiedText = createUnifiedText(rows, hunks);
+  requireEngineTime(deadline);
   return {
-    summary: summarize(rows),
+    summary,
     rows,
     hunks,
-    unifiedText: createUnifiedText(rows, hunks),
+    unifiedText,
   };
 }
 

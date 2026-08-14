@@ -168,12 +168,17 @@ function SplitRow({ row }: { row: DiffRow }) {
   );
 }
 
-function CollapsedContext({ children, count }: { children: ReactNode; count: number }) {
+function CollapsedContext({ count, renderRows }: {
+  count: number;
+  renderRows: () => ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <li className="diff__context">
-      <details>
+      <details onToggle={event => setExpanded(event.currentTarget.open)}>
         <summary>显示 {count} 行未更改内容</summary>
-        <ol className="diff__context-rows">{children}</ol>
+        {expanded && <ol className="diff__context-rows">{renderRows()}</ol>}
       </details>
     </li>
   );
@@ -183,9 +188,13 @@ function UnifiedView({ result }: { result: DiffResult }) {
   return (
     <ol className="diff__rows diff__rows--unified" aria-label="统一差异">
       {groupRows(result.rows, result.hunks).map(group => group.collapsed ? (
-        <CollapsedContext key={group.start} count={group.rows.length}>
-          {group.rows.map((row, index) => <UnifiedRow key={group.start + index} row={row} />)}
-        </CollapsedContext>
+        <CollapsedContext
+          key={group.start}
+          count={group.rows.length}
+          renderRows={() => group.rows.map((row, index) => (
+            <UnifiedRow key={group.start + index} row={row} />
+          ))}
+        />
       ) : (
         <UnifiedRow key={group.start} row={group.rows[0]} />
       ))}
@@ -202,9 +211,13 @@ function SplitView({ result }: { result: DiffResult }) {
       </div>
       <ol className="diff__rows diff__rows--split" aria-label="并排差异">
         {groupRows(result.rows, result.hunks).map(group => group.collapsed ? (
-          <CollapsedContext key={group.start} count={group.rows.length}>
-            {group.rows.map((row, index) => <SplitRow key={group.start + index} row={row} />)}
-          </CollapsedContext>
+          <CollapsedContext
+            key={group.start}
+            count={group.rows.length}
+            renderRows={() => group.rows.map((row, index) => (
+              <SplitRow key={group.start + index} row={row} />
+            ))}
+          />
         ) : (
           <SplitRow key={group.start} row={group.rows[0]} />
         ))}

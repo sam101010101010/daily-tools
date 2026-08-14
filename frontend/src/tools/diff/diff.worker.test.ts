@@ -112,7 +112,7 @@ describe('text diff DTO contract', () => {
     });
   });
 
-  test('stops inline refinement after the shared Worker job deadline is exhausted', () => {
+  test('fails the whole result when a later inline row exhausts the shared Worker deadline', () => {
     const NativeSegmenter = Intl.Segmenter;
     const segmenterDescriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
     let now = 0;
@@ -129,7 +129,7 @@ describe('text diff DTO contract', () => {
       }
 
       segment(input: string): Intl.Segments {
-        now += 1_100;
+        now += 300;
         return this.delegate.segment(input);
       }
 
@@ -143,9 +143,11 @@ describe('text diff DTO contract', () => {
       value: AdvancingSegmenter,
     });
 
-    let result: ReturnType<typeof compare>;
+    let thrown: unknown;
     try {
-      result = compare('shared old\n', 'shared new\n');
+      compare('shared old\nsecond before\n', 'shared new\nsecond after\n');
+    } catch (error) {
+      thrown = error;
     } finally {
       nowSpy.mockRestore();
       if (segmenterDescriptor) {
@@ -155,10 +157,25 @@ describe('text diff DTO contract', () => {
       }
     }
 
-    expect(result.rows[0].inline).toEqual({
-      left: [{ kind: 'delete', text: 'shared old' }],
-      right: [{ kind: 'insert', text: 'shared new' }],
+    expect(thrown).toMatchObject({ code: 'DIFF_TOO_COMPLEX' });
+  });
+
+  test('returns the same successful inline DTO while clock progress stays within the deadline', () => {
+    const baseline = compare('shared old\nsecond before\n', 'shared new\nsecond after\n');
+    let now = 0;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => {
+      now += 1;
+      return now;
     });
+
+    let underLoad: ReturnType<typeof compare>;
+    try {
+      underLoad = compare('shared old\nsecond before\n', 'shared new\nsecond after\n');
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    expect(underLoad).toEqual(baseline);
   });
 
   test('ignores trailing spaces and tabs only when explicitly requested', () => {

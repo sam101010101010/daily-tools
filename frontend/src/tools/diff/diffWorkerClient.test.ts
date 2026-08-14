@@ -36,8 +36,22 @@ const request = {
 
 const result = {
   summary: { added: 0, deleted: 0, changed: 1, unchanged: 0 },
-  rows: [],
-  hunks: [],
+  rows: [
+    {
+      kind: 'replace',
+      leftLineNumber: 1,
+      rightLineNumber: 1,
+      leftText: 'before',
+      rightText: 'after',
+      leftEnding: 'lf',
+      rightEnding: 'lf',
+      inline: {
+        left: [{ kind: 'delete', text: 'before' }],
+        right: [{ kind: 'insert', text: 'after' }],
+      },
+    },
+  ],
+  hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, rowStart: 0, rowEnd: 1 }],
   unifiedText: 'patch',
 };
 
@@ -181,6 +195,48 @@ describe('diff Worker client', () => {
 
     worker.emit({ type: 'result', jobId });
 
+    expect(callbacks.onError).toHaveBeenCalledWith('本地文本对比失败，请重试。');
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['non-integer summary count', { ...result, summary: { ...result.summary, changed: 0.5 } }],
+    ['non-finite summary count', { ...result, summary: { ...result.summary, added: Number.NaN } }],
+    ['negative summary count', { ...result, summary: { ...result.summary, deleted: -1 } }],
+    ['unknown row kind', { ...result, rows: [{ ...result.rows[0], kind: 'move' }] }],
+    ['invalid row nullability', { ...result, rows: [{ ...result.rows[0], leftText: null }] }],
+    ['invalid line number', { ...result, rows: [{ ...result.rows[0], leftLineNumber: 0 }] }],
+    ['unknown line ending', { ...result, rows: [{ ...result.rows[0], rightEnding: 'unix' }] }],
+    [
+      'invalid inline segment',
+      {
+        ...result,
+        rows: [{
+          ...result.rows[0],
+          inline: {
+            left: [{ kind: 'insert', text: 'before' }],
+            right: [{ kind: 'insert', text: 'after' }],
+          },
+        }],
+      },
+    ],
+    [
+      'invalid hunk range',
+      { ...result, hunks: [{ ...result.hunks[0], rowEnd: 2 }] },
+    ],
+    [
+      'non-integer hunk field',
+      { ...result, hunks: [{ ...result.hunks[0], oldLines: 0.5 }] },
+    ],
+  ])('maps a nested malformed result (%s) to the generic error', (_name, malformedResult) => {
+    const callbacks = handlers();
+    startDiffJob(request, callbacks);
+    const worker = MockWorker.instances[0];
+    const jobId = postedJobId(worker);
+
+    worker.emit({ type: 'result', jobId, result: malformedResult });
+
+    expect(callbacks.onResult).not.toHaveBeenCalled();
     expect(callbacks.onError).toHaveBeenCalledWith('本地文本对比失败，请重试。');
     expect(worker.terminate).toHaveBeenCalledOnce();
   });

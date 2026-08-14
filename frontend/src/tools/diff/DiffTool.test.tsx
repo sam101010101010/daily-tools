@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { copyText } from '../../lib/copy';
-import type { DiffResult } from './diff';
+import type { DiffResult, DiffRow } from './diff';
 import DiffTool from './DiffTool';
 import { startDiffJob } from './diffWorkerClient';
 
@@ -228,12 +228,54 @@ test('keeps unchanged row groups collapsed until their keyboard-operable disclos
   expect(disclosure).not.toHaveAttribute('open');
   expect(screen.getByText('heading').closest('details')).toBeNull();
   expect(screen.getByText('footer').closest('details')).toBeNull();
+  expect(within(disclosure!).queryByText('context one')).not.toBeInTheDocument();
+  expect(within(disclosure!).queryByText('context two')).not.toBeInTheDocument();
 
   await user.click(screen.getByText('显示 2 行未更改内容'));
 
   expect(disclosure).toHaveAttribute('open');
   expect(within(disclosure!).getByText('context one')).toBeInTheDocument();
   expect(within(disclosure!).getByText('context two')).toBeInTheDocument();
+});
+
+test('does not map a closed collapsed group at the 50,000-row boundary', async () => {
+  let hiddenGroupMapCalls = 0;
+  class BoundaryRows extends Array<DiffRow> {
+    override map<U>(
+      callback: (value: DiffRow, index: number, array: DiffRow[]) => U,
+      thisArg?: unknown,
+    ): U[] {
+      if (this.length === 50_000) {
+        hiddenGroupMapCalls += 1;
+        return [];
+      }
+      return super.map(callback, thisArg);
+    }
+  }
+  const row: DiffRow = {
+    kind: 'equal',
+    leftLineNumber: 1,
+    rightLineNumber: 1,
+    leftText: 'boundary hidden row',
+    rightText: 'boundary hidden row',
+    leftEnding: 'lf',
+    rightEnding: 'lf',
+  };
+  const rows = new BoundaryRows(50_000);
+  rows.fill(row);
+  const boundaryResult: DiffResult = {
+    summary: { added: 0, deleted: 0, changed: 0, unchanged: 50_000 },
+    rows,
+    hunks: [],
+    unifiedText: '',
+  };
+
+  render(<DiffTool />);
+  await compareAndReturn(boundaryResult);
+
+  expect(screen.getByText('显示 50000 行未更改内容')).toBeInTheDocument();
+  expect(hiddenGroupMapCalls).toBe(0);
+  expect(screen.queryByText('boundary hidden row')).not.toBeInTheDocument();
 });
 
 test('switches to a DTO-row-aligned split view with explicit null-side placeholders', async () => {
@@ -245,6 +287,8 @@ test('switches to a DTO-row-aligned split view with explicit null-side placehold
 
   expect(screen.queryByLabelText('统一差异')).not.toBeInTheDocument();
   const split = screen.getByLabelText('并排差异');
+  const disclosure = within(split).getByText('显示 2 行未更改内容').closest('details')!;
+  expect(within(disclosure).queryByText('context one')).not.toBeInTheDocument();
   const replacementRow = within(split).getByLabelText('old value').closest('li')!;
   expect(within(replacementRow).getByLabelText('new value')).toBeInTheDocument();
   expect(within(replacementRow).getByLabelText('原始文本第 2 行')).toBeInTheDocument();
@@ -254,6 +298,10 @@ test('switches to a DTO-row-aligned split view with explicit null-side placehold
   expect(within(insertionRow).getByLabelText('原始文本无对应行')).toHaveTextContent('—');
   expect(within(insertionRow).getByLabelText('修改后文本第 5 行')).toBeInTheDocument();
   expect(within(insertionRow).getByLabelText('新增行')).toHaveTextContent('+');
+
+  await user.click(within(split).getByText('显示 2 行未更改内容'));
+  expect(within(disclosure).getAllByLabelText('context one')).toHaveLength(2);
+  expect(within(disclosure).getAllByLabelText('context two')).toHaveLength(2);
 });
 
 test('uses a distinct visible marker for a split side with no corresponding line', async () => {
