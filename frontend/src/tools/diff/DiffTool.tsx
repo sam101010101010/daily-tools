@@ -61,7 +61,7 @@ function Marker({ kind }: { kind: 'equal' | 'insert' | 'delete' | 'none' }) {
     equal: { label: '未更改行', symbol: '·' },
     insert: { label: '新增行', symbol: '+' },
     delete: { label: '删除行', symbol: '−' },
-    none: { label: '无对应行', symbol: '·' },
+    none: { label: '无对应行', symbol: '∅' },
   }[kind];
 
   return <span className={`diff__marker diff__marker--${kind}`} aria-label={definition.label}>{definition.symbol}</span>;
@@ -405,9 +405,11 @@ export default function DiffTool() {
             </label>
           </fieldset>
 
-          {viewMode === 'unified'
-            ? <UnifiedView result={result} />
-            : <SplitView result={result} />}
+          <div className="diff__viewport">
+            {viewMode === 'unified'
+              ? <UnifiedView result={result} />
+              : <SplitView result={result} />}
+          </div>
         </section>
       )}
 

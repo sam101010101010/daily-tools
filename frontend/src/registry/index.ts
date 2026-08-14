@@ -17,6 +17,7 @@ import { textMeta } from '../tools/text/meta';
 import { certDecoderMeta } from '../tools/cert-decoder/meta';
 import { timezoneMeta } from '../tools/timezone/meta';
 import { yamlMeta } from '../tools/yaml/meta';
+import { diffMeta } from '../tools/diff/meta';
 
 export const tools: ToolMeta[] = [
   jsonMeta,
@@ -37,6 +38,7 @@ export const tools: ToolMeta[] = [
   certDecoderMeta,
   timezoneMeta,
   yamlMeta,
+  diffMeta,
 ];
 
 export function getTool(id: string): ToolMeta | undefined {

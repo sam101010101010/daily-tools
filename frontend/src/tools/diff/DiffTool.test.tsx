@@ -256,6 +256,17 @@ test('switches to a DTO-row-aligned split view with explicit null-side placehold
   expect(within(insertionRow).getByLabelText('新增行')).toHaveTextContent('+');
 });
 
+test('uses a distinct visible marker for a split side with no corresponding line', async () => {
+  const user = userEvent.setup();
+  render(<DiffTool />);
+  await compareAndReturn();
+  await user.click(screen.getByRole('radio', { name: '并排视图' }));
+
+  const insertionRow = within(screen.getByLabelText('并排差异')).getByText('added').closest('li')!;
+  expect(within(insertionRow).getByLabelText('无对应行')).toHaveTextContent('∅');
+  expect(within(insertionRow).getByLabelText('无对应行')).not.toHaveTextContent('·');
+});
+
 test('always copies the deterministic unified DTO text and uses one polite status region', async () => {
   const user = userEvent.setup();
   render(<DiffTool />);
