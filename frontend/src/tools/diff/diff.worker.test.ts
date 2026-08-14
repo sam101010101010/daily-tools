@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { computeTextDiff, runDiffWorkerJob } from './diff.worker';
 
@@ -89,6 +89,76 @@ describe('text diff DTO contract', () => {
     expect(result.unifiedText).toBe(
       '--- original\n+++ modified\n@@ -1,1 +1,1 @@\n-family 👨‍👩‍👧\n+family 👨‍👩‍👦\n',
     );
+  });
+
+  test('falls back to whole-change segments when Intl.Segmenter is unavailable', () => {
+    const segmenterDescriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
+    Object.defineProperty(Intl, 'Segmenter', { configurable: true, value: undefined });
+
+    let result: ReturnType<typeof compare>;
+    try {
+      result = compare('family 👨‍👩‍👧\n', 'family 👨‍👩‍👦\n');
+    } finally {
+      if (segmenterDescriptor) {
+        Object.defineProperty(Intl, 'Segmenter', segmenterDescriptor);
+      } else {
+        Reflect.deleteProperty(Intl, 'Segmenter');
+      }
+    }
+
+    expect(result.rows[0].inline).toEqual({
+      left: [{ kind: 'delete', text: 'family 👨‍👩‍👧' }],
+      right: [{ kind: 'insert', text: 'family 👨‍👩‍👦' }],
+    });
+  });
+
+  test('stops inline refinement after the shared Worker job deadline is exhausted', () => {
+    const NativeSegmenter = Intl.Segmenter;
+    const segmenterDescriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
+    let now = 0;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+    class AdvancingSegmenter {
+      private readonly delegate: Intl.Segmenter;
+
+      constructor(
+        locales?: Intl.LocalesArgument,
+        options?: Intl.SegmenterOptions,
+      ) {
+        this.delegate = new NativeSegmenter(locales, options);
+      }
+
+      segment(input: string): Intl.Segments {
+        now += 1_100;
+        return this.delegate.segment(input);
+      }
+
+      resolvedOptions(): Intl.ResolvedSegmenterOptions {
+        return this.delegate.resolvedOptions();
+      }
+    }
+
+    Object.defineProperty(Intl, 'Segmenter', {
+      configurable: true,
+      value: AdvancingSegmenter,
+    });
+
+    let result: ReturnType<typeof compare>;
+    try {
+      result = compare('shared old\n', 'shared new\n');
+    } finally {
+      nowSpy.mockRestore();
+      if (segmenterDescriptor) {
+        Object.defineProperty(Intl, 'Segmenter', segmenterDescriptor);
+      } else {
+        Reflect.deleteProperty(Intl, 'Segmenter');
+      }
+    }
+
+    expect(result.rows[0].inline).toEqual({
+      left: [{ kind: 'delete', text: 'shared old' }],
+      right: [{ kind: 'insert', text: 'shared new' }],
+    });
   });
 
   test('ignores trailing spaces and tabs only when explicitly requested', () => {

@@ -79,20 +79,33 @@ function appendSegment(
   }
 }
 
+function wholeChangeInline(leftText: string, rightText: string): InlineDiff {
+  return {
+    left: leftText === '' ? [] : [{ kind: 'delete', text: leftText }],
+    right: rightText === '' ? [] : [{ kind: 'insert', text: rightText }],
+  };
+}
+
+function remainingEngineTime(deadline: number): number {
+  return Math.max(0, deadline - Date.now());
+}
+
 function refineChangedText(
   leftText: string,
   rightText: string,
   segmenter: Intl.Segmenter,
+  deadline: number,
 ): InlineDiff {
+  if (remainingEngineTime(deadline) === 0) return wholeChangeInline(leftText, rightText);
+
   const leftGraphemes = Array.from(segmenter.segment(leftText), ({ segment }) => segment);
   const rightGraphemes = Array.from(segmenter.segment(rightText), ({ segment }) => segment);
-  const changes = diffArrays(leftGraphemes, rightGraphemes, { timeout: ENGINE_TIMEOUT_MS });
+  const timeout = remainingEngineTime(deadline);
+  if (timeout === 0) return wholeChangeInline(leftText, rightText);
+  const changes = diffArrays(leftGraphemes, rightGraphemes, { timeout });
 
   if (changes === undefined) {
-    return {
-      left: leftText === '' ? [] : [{ kind: 'delete', text: leftText }],
-      right: rightText === '' ? [] : [{ kind: 'insert', text: rightText }],
-    };
+    return wholeChangeInline(leftText, rightText);
   }
 
   const left: InlineSegment[] = [];
@@ -111,15 +124,23 @@ function refineChangedText(
   return { left, right };
 }
 
-function createInlineDiff(leftText: string, rightText: string): InlineDiff | undefined {
-  if (leftText === rightText || typeof Intl.Segmenter !== 'function') return undefined;
+function createInlineDiff(
+  leftText: string,
+  rightText: string,
+  deadline: number,
+): InlineDiff | undefined {
+  if (leftText === rightText) return undefined;
+  if (typeof Intl.Segmenter !== 'function') return wholeChangeInline(leftText, rightText);
+  if (remainingEngineTime(deadline) === 0) return wholeChangeInline(leftText, rightText);
 
   const wordSegmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
   const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   const leftWords = Array.from(wordSegmenter.segment(leftText), ({ segment }) => segment);
   const rightWords = Array.from(wordSegmenter.segment(rightText), ({ segment }) => segment);
-  const changes = diffArrays(leftWords, rightWords, { timeout: ENGINE_TIMEOUT_MS });
-  if (changes === undefined) return undefined;
+  const timeout = remainingEngineTime(deadline);
+  if (timeout === 0) return wholeChangeInline(leftText, rightText);
+  const changes = diffArrays(leftWords, rightWords, { timeout });
+  if (changes === undefined) return wholeChangeInline(leftText, rightText);
 
   const left: InlineSegment[] = [];
   const right: InlineSegment[] = [];
@@ -140,7 +161,7 @@ function createInlineDiff(leftText: string, rightText: string): InlineDiff | und
       if (changes[index].added) changedRight += changes[index].value.join('');
       index += 1;
     }
-    const refined = refineChangedText(changedLeft, changedRight, graphemeSegmenter);
+    const refined = refineChangedText(changedLeft, changedRight, graphemeSegmenter, deadline);
     for (const segment of refined.left) appendSegment(left, segment.kind, segment.text);
     for (const segment of refined.right) appendSegment(right, segment.kind, segment.text);
   }
@@ -152,6 +173,7 @@ function buildRows(
   changes: readonly Change[],
   leftLines: readonly IndexedLine[],
   rightLines: readonly IndexedLine[],
+  deadline: number,
 ): DiffRow[] {
   const rows: DiffRow[] = [];
   let leftIndex = 0;
@@ -164,7 +186,7 @@ function buildRows(
     for (let index = 0; index < paired; index += 1) {
       const left = pendingLeft[index];
       const right = pendingRight[index];
-      const inline = createInlineDiff(left.text, right.text);
+      const inline = createInlineDiff(left.text, right.text, deadline);
       rows.push({
         kind: 'replace',
         leftLineNumber: leftIndex - pendingLeft.length + index + 1,
@@ -337,16 +359,21 @@ function createUnifiedText(rows: readonly DiffRow[], hunks: readonly DiffHunk[])
 }
 
 export function computeTextDiff(request: DiffRequest): DiffResult {
+  const deadline = Date.now() + ENGINE_TIMEOUT_MS;
   validateDiffRequest(request);
   const leftLines = prepareLines(request.left, request);
   const rightLines = prepareLines(request.right, request);
-  const changes = diffLines(engineInput(leftLines), engineInput(rightLines), {
+  const leftEngineInput = engineInput(leftLines);
+  const rightEngineInput = engineInput(rightLines);
+  const timeout = remainingEngineTime(deadline);
+  if (timeout === 0) throw new DiffComputationError('DIFF_TOO_COMPLEX');
+  const changes = diffLines(leftEngineInput, rightEngineInput, {
     newlineIsToken: true,
-    timeout: ENGINE_TIMEOUT_MS,
+    timeout,
   });
   if (changes === undefined) throw new DiffComputationError('DIFF_TOO_COMPLEX');
 
-  const rows = buildRows(changes, leftLines, rightLines);
+  const rows = buildRows(changes, leftLines, rightLines, deadline);
   const hunks = createHunks(rows);
   return {
     summary: summarize(rows),
