@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 const licensePath = 'third-party-licenses/qr-0.6.0-LICENSE-MIT.txt';
 const yamlLicensePath = 'third-party-licenses/yaml-2.9.0-LICENSE-ISC.txt';
+const diffLicensePath = 'third-party-licenses/diff-9.0.0-LICENSE-BSD-3-Clause.txt';
 
 async function readArtifact(label, url) {
   try {
@@ -54,3 +55,27 @@ if (!yamlDeployed.equals(yamlTracked)) {
 }
 
 console.log(`Verified ${yamlLicensePath} in the production distribution`);
+
+const diffTracked = await readArtifact(
+  'Tracked diff@9.0.0 BSD-3-Clause notice',
+  new URL(`../public/${diffLicensePath}`, import.meta.url),
+);
+const diffInstalled = await readArtifact(
+  'Installed diff@9.0.0 BSD-3-Clause license',
+  new URL('../node_modules/diff/LICENSE', import.meta.url),
+);
+const diffDeployed = await readArtifact(
+  'Deployed diff@9.0.0 BSD-3-Clause notice',
+  new URL(`../dist/${diffLicensePath}`, import.meta.url),
+);
+
+if (!diffTracked.equals(diffInstalled)) {
+  throw new Error(
+    'Tracked diff@9.0.0 BSD-3-Clause notice does not match node_modules/diff/LICENSE',
+  );
+}
+if (!diffDeployed.equals(diffTracked)) {
+  throw new Error('Deployed diff@9.0.0 BSD-3-Clause notice does not match the tracked public notice');
+}
+
+console.log(`Verified ${diffLicensePath} in the production distribution`);
