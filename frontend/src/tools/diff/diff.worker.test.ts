@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { computeTextDiff } from './diff.worker';
+import { computeTextDiff, runDiffWorkerJob } from './diff.worker';
 
 type Options = {
   ignoreLineEndingStyle?: boolean;
@@ -182,4 +182,88 @@ describe('text diff DTO contract', () => {
       { oldStart: 7, oldLines: 5, newStart: 7, newLines: 5, rowStart: 6, rowEnd: 11 },
     ]);
   });
+});
+
+describe('text diff computation bounds', () => {
+  test('accepts exactly 50,000 lines and rejects the next line defensively', () => {
+    const atLimit = '\n'.repeat(50_000);
+    expect(compare(atLimit, atLimit).summary.unchanged).toBe(50_000);
+
+    const messages: unknown[] = [];
+    runDiffWorkerJob(
+      {
+        type: 'start',
+        jobId: 'line-limit',
+        request: {
+          left: `${atLimit}\n`,
+          right: '',
+          options: { ignoreLineEndingStyle: false, ignoreTrailingWhitespace: false },
+        },
+      },
+      (message) => messages.push(message),
+    );
+
+    expect(messages).toEqual([
+      { type: 'error', jobId: 'line-limit', code: 'DIFF_TOO_MANY_LINES' },
+    ]);
+  });
+
+  test('rejects a side above 1 MiB by UTF-8 bytes without leaking internal details', () => {
+    const messages: unknown[] = [];
+    runDiffWorkerJob(
+      {
+        type: 'start',
+        jobId: 'byte-limit',
+        request: {
+          left: '你'.repeat(349_526),
+          right: '',
+          options: { ignoreLineEndingStyle: false, ignoreTrailingWhitespace: false },
+        },
+      },
+      (message) => messages.push(message),
+    );
+
+    expect(messages).toEqual([
+      { type: 'error', jobId: 'byte-limit', code: 'DIFF_INPUT_TOO_LARGE' },
+    ]);
+  });
+
+  test('collapses malformed requests into the stable engine error code', () => {
+    const messages: unknown[] = [];
+    runDiffWorkerJob(
+      {
+        type: 'start',
+        jobId: 'malformed',
+        request: null,
+      } as never,
+      (message) => messages.push(message),
+    );
+
+    expect(messages).toEqual([
+      { type: 'error', jobId: 'malformed', code: 'DIFF_ENGINE_FAILED' },
+    ]);
+  });
+
+  test('maps the engine deadline sentinel to the stable complexity error code', () => {
+    const left = Array.from({ length: 50_000 }, (_, index) => `left-${index}\n`).join('');
+    const right = Array.from({ length: 50_000 }, (_, index) => `right-${index}\n`).join('');
+    const messages: unknown[] = [];
+
+    runDiffWorkerJob(
+      {
+        type: 'start',
+        jobId: 'complexity',
+        request: {
+          left,
+          right,
+          options: { ignoreLineEndingStyle: false, ignoreTrailingWhitespace: false },
+        },
+      },
+      (message) => messages.push(message),
+    );
+
+    expect(messages).toEqual([
+      { type: 'error', jobId: 'complexity', code: 'DIFF_TOO_COMPLEX' },
+    ]);
+  }, 5_000);
 });
