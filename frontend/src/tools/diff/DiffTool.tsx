@@ -257,7 +257,7 @@ export default function DiffTool() {
   function compare() {
     invalidateComparison();
     const version = versionRef.current;
-    let settledSynchronously = false;
+    let settled = false;
     setRunning(true);
 
     const job = startDiffJob(
@@ -268,16 +268,16 @@ export default function DiffTool() {
       },
       {
         onResult: nextResult => {
-          if (versionRef.current !== version) return;
-          settledSynchronously = true;
+          if (settled || versionRef.current !== version) return;
+          settled = true;
           cancelRef.current = undefined;
           setRunning(false);
           setError('');
           setResult(nextResult);
         },
         onError: message => {
-          if (versionRef.current !== version) return;
-          settledSynchronously = true;
+          if (settled || versionRef.current !== version) return;
+          settled = true;
           cancelRef.current = undefined;
           setRunning(false);
           setResult(undefined);
@@ -286,7 +286,7 @@ export default function DiffTool() {
       },
     );
 
-    if (!settledSynchronously && versionRef.current === version) cancelRef.current = job;
+    if (!settled && versionRef.current === version) cancelRef.current = job;
   }
 
   function cancelComparison() {

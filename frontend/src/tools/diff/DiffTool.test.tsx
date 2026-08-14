@@ -347,6 +347,36 @@ test('ignores saved stale success and error callbacks after an input change and 
   expect(mockedCopyText).toHaveBeenCalledWith(UNIFIED_TEXT);
 });
 
+test('keeps an accepted result when the same job later calls its error handler', async () => {
+  const user = userEvent.setup();
+  render(<DiffTool />);
+  await user.click(screen.getByRole('button', { name: '比较文本' }));
+  const handlers = latestHandlers();
+
+  act(() => {
+    handlers.onResult(RESULT);
+    handlers.onError('late error from completed job');
+  });
+
+  expect(screen.getByLabelText('差异摘要')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('keeps an accepted error when the same job later calls its result handler', async () => {
+  const user = userEvent.setup();
+  render(<DiffTool />);
+  await user.click(screen.getByRole('button', { name: '比较文本' }));
+  const handlers = latestHandlers();
+
+  act(() => {
+    handlers.onError('first terminal error');
+    handlers.onResult(RESULT);
+  });
+
+  expect(screen.getByRole('alert')).toHaveTextContent('first terminal error');
+  expect(screen.queryByLabelText('差异摘要')).not.toBeInTheDocument();
+});
+
 test('handles a synchronous startup error without retaining a phantom loading or cancel state', async () => {
   const user = userEvent.setup();
   mockedStartDiffJob.mockImplementationOnce((_request, handlers) => {
