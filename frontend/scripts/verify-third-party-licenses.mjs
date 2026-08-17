@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 const licensePath = 'third-party-licenses/qr-0.6.0-LICENSE-MIT.txt';
 const yamlLicensePath = 'third-party-licenses/yaml-2.9.0-LICENSE-ISC.txt';
 const diffLicensePath = 'third-party-licenses/diff-9.0.0-LICENSE-BSD-3-Clause.txt';
+const csvParseLicensePath = 'third-party-licenses/csv-parse-7.0.2-LICENSE-MIT.txt';
 
 async function readArtifact(label, url) {
   try {
@@ -79,3 +80,29 @@ if (!diffDeployed.equals(diffTracked)) {
 }
 
 console.log(`Verified ${diffLicensePath} in the production distribution`);
+
+const csvParseTracked = await readArtifact(
+  'Tracked csv-parse@7.0.2 MIT notice',
+  new URL(`../public/${csvParseLicensePath}`, import.meta.url),
+);
+const csvParseInstalled = await readArtifact(
+  'Installed csv-parse@7.0.2 MIT license',
+  new URL('../node_modules/csv-parse/LICENSE', import.meta.url),
+);
+const csvParseDeployed = await readArtifact(
+  'Deployed csv-parse@7.0.2 MIT notice',
+  new URL(`../dist/${csvParseLicensePath}`, import.meta.url),
+);
+
+if (!csvParseTracked.equals(csvParseInstalled)) {
+  throw new Error(
+    'Tracked csv-parse@7.0.2 MIT notice does not match node_modules/csv-parse/LICENSE',
+  );
+}
+if (!csvParseDeployed.equals(csvParseTracked)) {
+  throw new Error(
+    'Deployed csv-parse@7.0.2 MIT notice does not match the tracked public notice',
+  );
+}
+
+console.log(`Verified ${csvParseLicensePath} in the production distribution`);
