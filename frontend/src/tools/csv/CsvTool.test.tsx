@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { copyText } from '../../lib/copy';
 import type { TabularErrorCode, TabularRequest, TabularResult } from './csv.worker';
@@ -260,6 +261,29 @@ test('cancels an active job exactly once on cancel and unmount, while late callb
   unmount();
   expect(jobs[1].cancel).toHaveBeenCalledOnce();
   act(() => { jobs[1].handlers.onResult(success()); });
+});
+
+test('accepts a successful worker conversion under the application Strict Mode lifecycle', async () => {
+  const user = userEvent.setup();
+  const jobs = captureJobs();
+  render(<StrictMode><CsvTool /></StrictMode>);
+
+  await user.click(screen.getByRole('button', { name: '转换' }));
+  completeLatest(jobs);
+
+  expect(screen.getByLabelText('JSON 输出')).toHaveValue(success().output);
+  expect(screen.getByText('处理完成')).toBeInTheDocument();
+});
+
+test('retains and cancels an active worker exactly once on Strict Mode final unmount', async () => {
+  const user = userEvent.setup();
+  const jobs = captureJobs();
+  const { unmount } = render(<StrictMode><CsvTool /></StrictMode>);
+
+  await user.click(screen.getByRole('button', { name: '转换' }));
+  unmount();
+
+  expect(jobs[0].cancel).toHaveBeenCalledOnce();
 });
 
 test('puts output back into the opposite input mode without starting another conversion', async () => {

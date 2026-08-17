@@ -85,16 +85,21 @@ export default function CsvTool() {
   const downloadTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const details = MODE_DETAILS[mode];
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    jobTokenRef.current += 1;
-    activeJobRef.current?.cancel();
-    activeJobRef.current = undefined;
-    copyTokenRef.current += 1;
-    downloadTimersRef.current.forEach(timer => clearTimeout(timer));
-    downloadTimersRef.current.clear();
-    activeDownloadsRef.current.forEach(url => URL.revokeObjectURL(url));
-    activeDownloadsRef.current.clear();
+  useEffect(() => {
+    mountedRef.current = true;
+    const activeDownloads = activeDownloadsRef.current;
+    const downloadTimers = downloadTimersRef.current;
+    return () => {
+      mountedRef.current = false;
+      jobTokenRef.current += 1;
+      activeJobRef.current?.cancel();
+      activeJobRef.current = undefined;
+      copyTokenRef.current += 1;
+      downloadTimers.forEach(timer => clearTimeout(timer));
+      downloadTimers.clear();
+      activeDownloads.forEach(url => URL.revokeObjectURL(url));
+      activeDownloads.clear();
+    };
   }, []);
 
   function cancelActiveJob() {
