@@ -252,7 +252,7 @@ describe('UTF-8 byte and data-row limits', () => {
     const input = `value\n${'a'.repeat(FIVE_MIB - 9)}界b`;
     expect(utf8.encode(input)).toHaveLength(FIVE_MIB + 1);
 
-    expect(csvToJson(input)).toMatchObject({
+    expect(csvToJson(input)).toEqual({
       kind: 'failure',
       code: 'TABULAR_INPUT_TOO_LARGE',
     });
@@ -267,7 +267,7 @@ describe('UTF-8 byte and data-row limits', () => {
   });
 
   it('rejects the 100,001st data row without returning partial output', () => {
-    expect(csvToJson(csvWithDataRows(MAX_DATA_ROWS + 1))).toMatchObject({
+    expect(csvToJson(csvWithDataRows(MAX_DATA_ROWS + 1))).toEqual({
       kind: 'failure',
       code: 'TABULAR_TOO_MANY_ROWS',
     });
