@@ -3,6 +3,14 @@ import { convertTabular } from './csv';
 
 type Delimiter = ',' | '\t' | ';';
 
+const FIVE_MIB = 5 * 1024 * 1024;
+const MAX_DATA_ROWS = 100_000;
+const utf8 = new TextEncoder();
+
+function csvWithDataRows(count: number): string {
+  return `id\n${'1\n'.repeat(count)}`;
+}
+
 function csvToJson(
   input: string,
   options: { delimiter?: Delimiter; header?: boolean } = {},
@@ -224,6 +232,44 @@ describe('flat JSON to deterministic CSV contract', () => {
       code: 'JSON_NESTED_VALUE',
       row: 1,
       column: 2,
+    });
+  });
+});
+
+describe('UTF-8 byte and data-row limits', () => {
+  it('accepts input of exactly 5 MiB measured as UTF-8 bytes', () => {
+    const input = `value\n${'a'.repeat(FIVE_MIB - 9)}界`;
+    expect(utf8.encode(input)).toHaveLength(FIVE_MIB);
+
+    expect(csvToJson(input)).toMatchObject({
+      kind: 'success',
+      rowCount: 1,
+      columnCount: 1,
+    });
+  });
+
+  it('rejects input of 5 MiB plus one UTF-8 byte before parsing', () => {
+    const input = `value\n${'a'.repeat(FIVE_MIB - 9)}界b`;
+    expect(utf8.encode(input)).toHaveLength(FIVE_MIB + 1);
+
+    expect(csvToJson(input)).toMatchObject({
+      kind: 'failure',
+      code: 'TABULAR_INPUT_TOO_LARGE',
+    });
+  });
+
+  it('accepts exactly 100,000 data rows without counting the header row', () => {
+    expect(csvToJson(csvWithDataRows(MAX_DATA_ROWS))).toMatchObject({
+      kind: 'success',
+      rowCount: MAX_DATA_ROWS,
+      columnCount: 1,
+    });
+  });
+
+  it('rejects the 100,001st data row without returning partial output', () => {
+    expect(csvToJson(csvWithDataRows(MAX_DATA_ROWS + 1))).toMatchObject({
+      kind: 'failure',
+      code: 'TABULAR_TOO_MANY_ROWS',
     });
   });
 });
