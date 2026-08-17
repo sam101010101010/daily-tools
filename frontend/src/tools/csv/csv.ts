@@ -169,6 +169,7 @@ function convertCsvToJson(request: TabularRequest): TabularResult {
       delimiter: request.delimiter,
       relax_column_count_less: true,
       relax_column_count_more: true,
+      to: TABULAR_MAX_DATA_ROWS + (request.header ? 2 : 1),
     });
   } catch (error) {
     return csvSyntaxFailure(error);
