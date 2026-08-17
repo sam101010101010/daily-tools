@@ -301,15 +301,15 @@ export default function CsvTool() {
       {result && (
         <>
           {result.warnings.length > 0 && (
-            <ul id={WARNINGS_ID} aria-label="转换提示" aria-live="polite" aria-atomic="true">
+            <ul className="csv-tool__warnings" id={WARNINGS_ID} aria-label="转换提示" aria-live="polite" aria-atomic="true">
               {result.warnings.map(warning => <li key={warning}>{warningMessage(warning)}</li>)}
             </ul>
           )}
-          <p role="status" aria-live="polite" aria-describedby={result.warnings.length > 0 ? WARNINGS_ID : undefined}>
+          <p className="csv-tool__status" role="status" aria-live="polite" aria-describedby={result.warnings.length > 0 ? WARNINGS_ID : undefined}>
             {status || '处理完成'}
           </p>
           <p>共 {result.rowCount} 行，{result.columnCount} 列。</p>
-          <div className="csv-tool__preview" style={{ overflowX: 'auto' }}>
+          <div className="csv-tool__preview">
             <table aria-label="转换结果预览">
               <thead>
                 <tr>{previewHeaders.map(headerValue => <th key={headerValue} scope="col">{headerValue}</th>)}</tr>

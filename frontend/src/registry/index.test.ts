@@ -341,3 +341,27 @@ test('text diff is one browser-local registry tool with searchable discovery met
 
   await expect(diff[0].load()).resolves.toHaveProperty('default');
 });
+
+test('CSV / JSON converter is one browser-local registry tool with complete tabular discovery and a lazy route module', async () => {
+  // Catches a missing/duplicate central entry, approved-copy drift, accidental
+  // backend/icon wiring, weakened CSV/TSV discovery, or loss of lazy loading.
+  const csv = registry.filter(tool => tool.id === 'csv');
+
+  expect(csv).toHaveLength(1);
+  expect(new Set(registry.map(tool => tool.id)).size).toBe(registry.length);
+  expect(csv[0]).toMatchObject({
+    id: 'csv',
+    name: 'CSV / JSON 转换器',
+    description: '在浏览器本地转换 CSV、TSV 与扁平 JSON，预览并导出结果',
+    category: '格式化',
+    keywords: ['CSV', 'TSV', 'JSON', '表格', '转换', '逗号', '制表符'],
+  });
+  expect(csv[0]).not.toHaveProperty('backend');
+  expect(csv[0]).not.toHaveProperty('icon');
+
+  for (const query of ['CSV', 'tsv', 'JSON', '表格', '转换', '逗号', '制表符']) {
+    expect(searchTools(registry, query).map(tool => tool.id)).toContain('csv');
+  }
+
+  await expect(csv[0].load()).resolves.toHaveProperty('default');
+});
