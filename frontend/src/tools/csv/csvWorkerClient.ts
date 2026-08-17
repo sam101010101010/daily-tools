@@ -43,6 +43,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object';
 }
 
+function hasOnlyOwnKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Reflect.ownKeys(value).every(key => typeof key === 'string' && allowed.includes(key));
+}
+
+function hasExactOwnKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  return hasOnlyOwnKeys(value, expected)
+    && expected.length === Reflect.ownKeys(value).length
+    && expected.every(key => Object.hasOwn(value, key));
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(item => typeof item === 'string');
 }
@@ -75,16 +85,14 @@ function isTabularErrorCode(value: unknown): value is TabularErrorCode {
 function isTabularResult(value: unknown): value is TabularResult {
   if (!isRecord(value) || (value.kind !== 'success' && value.kind !== 'failure')) return false;
   if (value.kind === 'failure') {
-    return isTabularErrorCode(value.code)
-      && !Object.hasOwn(value, 'headers')
-      && !Object.hasOwn(value, 'rows')
-      && !Object.hasOwn(value, 'output')
-      && !Object.hasOwn(value, 'rowCount')
-      && !Object.hasOwn(value, 'columnCount')
-      && !Object.hasOwn(value, 'warnings')
-      && (value.row === undefined || (isNonNegativeInteger(value.row) && value.row > 0))
-      && (value.column === undefined || (isNonNegativeInteger(value.column) && value.column > 0));
+    return hasOnlyOwnKeys(value, ['kind', 'code', 'row', 'column'])
+      && Object.hasOwn(value, 'kind')
+      && Object.hasOwn(value, 'code')
+      && isTabularErrorCode(value.code)
+      && (!Object.hasOwn(value, 'row') || (isNonNegativeInteger(value.row) && value.row > 0))
+      && (!Object.hasOwn(value, 'column') || (isNonNegativeInteger(value.column) && value.column > 0));
   }
+  if (!hasExactOwnKeys(value, ['kind', 'headers', 'rows', 'output', 'rowCount', 'columnCount', 'warnings'])) return false;
   if (
     !isStringArray(value.headers)
     || !isRows(value.rows)
@@ -102,10 +110,13 @@ function isTabularResult(value: unknown): value is TabularResult {
 }
 
 function isWorkerMessage(value: unknown): value is TabularWorkerMessage {
-  return isRecord(value)
-    && typeof value.jobId === 'string'
-    && ((value.type === 'result' && isTabularResult(value.result))
-      || (value.type === 'error' && isTabularErrorCode(value.code)));
+  if (!isRecord(value) || typeof value.jobId !== 'string') return false;
+  if (value.type === 'result') {
+    return hasExactOwnKeys(value, ['type', 'jobId', 'result']) && isTabularResult(value.result);
+  }
+  return value.type === 'error'
+    && hasExactOwnKeys(value, ['type', 'jobId', 'code'])
+    && isTabularErrorCode(value.code);
 }
 
 export function startTabularJob(request: TabularRequest, handlers: TabularJobHandlers): TabularJob {
@@ -126,8 +137,8 @@ export function startTabularJob(request: TabularRequest, handlers: TabularJobHan
   activeJob = { jobId, worker };
   worker.onmessage = (event: MessageEvent<unknown>) => {
     const message = event.data;
-    if (!isRecord(message) || message.jobId !== jobId || activeJob?.jobId !== jobId) return;
-    if (!isWorkerMessage(message)) {
+    if (activeJob?.jobId !== jobId) return;
+    if (!isWorkerMessage(message) || message.jobId !== jobId) {
       if (clearActiveJob(jobId)) handlers.onError('TABULAR_ENGINE_FAILED');
       return;
     }

@@ -136,6 +136,23 @@ describe('CSV Worker client', () => {
     expect(worker.terminate).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ['missing job id', () => ({ type: 'result', result })],
+    ['wrong job id', () => ({ type: 'result', jobId: 'csv-job-wrong', result })],
+    ['unexpected wrapper key', (jobId: string) => ({ type: 'result', jobId, result, stack: 'native detail' })],
+  ])('fails a %s from the current Worker instead of leaving it active', (_name, createMessage) => {
+    const callbacks = handlers();
+    startTabularJob(request, callbacks);
+    const worker = MockWorker.instances[0];
+    const jobId = postedJobId(worker);
+
+    worker.onmessage?.({ data: createMessage(jobId) } as MessageEvent);
+
+    expect(callbacks.onResult).not.toHaveBeenCalled();
+    expect(callbacks.onError).toHaveBeenCalledWith('TABULAR_ENGINE_FAILED');
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+
   it('rejects a failure DTO that leaks partial success data', () => {
     const callbacks = handlers();
     startTabularJob(request, callbacks);
@@ -145,6 +162,22 @@ describe('CSV Worker client', () => {
     worker.onmessage?.({
       data: { type: 'result', jobId, result: { kind: 'failure', code: 'CSV_INVALID_SYNTAX', rows: [] } },
     } as MessageEvent);
+
+    expect(callbacks.onResult).not.toHaveBeenCalled();
+    expect(callbacks.onError).toHaveBeenCalledWith('TABULAR_ENGINE_FAILED');
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['failure stack', { kind: 'failure', code: 'CSV_INVALID_SYNTAX', stack: 'parser stack' }],
+    ['success dependency object', { ...result, parser: { internal: true } }],
+  ])('rejects a result with arbitrary extra %s', (_name, malformedResult) => {
+    const callbacks = handlers();
+    startTabularJob(request, callbacks);
+    const worker = MockWorker.instances[0];
+    const jobId = postedJobId(worker);
+
+    worker.onmessage?.({ data: { type: 'result', jobId, result: malformedResult } } as MessageEvent);
 
     expect(callbacks.onResult).not.toHaveBeenCalled();
     expect(callbacks.onError).toHaveBeenCalledWith('TABULAR_ENGINE_FAILED');
