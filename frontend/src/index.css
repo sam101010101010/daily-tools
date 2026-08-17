@@ -3223,3 +3223,157 @@ main section .diff__context {
   .diff__actions button,
   .diff__result-header button { flex: 1 1 100%; }
 }
+
+/* ---- Local CSV / JSON converter --------------------------------------- */
+
+.csv-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.csv-tool > p { margin: 0; }
+
+.csv-tool__controls {
+  display: grid;
+  grid-template-columns: max-content minmax(8rem, 1fr) max-content minmax(8rem, 1fr);
+  gap: 0.65rem 0.75rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.csv-tool__controls > label {
+  width: auto;
+  min-width: 0;
+}
+
+.csv-tool__controls > label:has(input) { grid-column: span 2; }
+
+.csv-tool__controls select {
+  width: 100%;
+  min-width: 0;
+}
+
+.csv-tool__panes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+.csv-tool__panes > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.csv-tool__panes label {
+  display: block;
+  width: auto;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.csv-tool__panes textarea {
+  width: 100%;
+  height: 18rem;
+  min-height: 18rem;
+  max-height: 18rem;
+  margin: 0;
+  overflow: auto;
+  resize: none;
+  white-space: pre-wrap;
+}
+
+.csv-tool__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.csv-tool__actions button { margin: 0; }
+
+main section .csv-tool__warnings {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  color: var(--accent-strong);
+  background: var(--accent-weak);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+main section .csv-tool__warnings li {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-family: var(--font);
+}
+
+.csv-tool__status {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 0.85rem;
+}
+
+main section .csv-tool__preview {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.csv-tool__preview table {
+  width: 100%;
+  min-width: 36rem;
+  border-collapse: collapse;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.csv-tool__preview :is(th, td) {
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+}
+
+.csv-tool__preview th {
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.csv-tool__preview tbody tr:last-child td { border-bottom: 0; }
+
+.csv-tool :is(select, textarea, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 390px) {
+  .csv-tool__controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .csv-tool__controls > label:has(input) { grid-column: auto; }
+  .csv-tool__panes { grid-template-columns: 1fr; }
+
+  .csv-tool__panes textarea {
+    height: 14rem;
+    min-height: 14rem;
+    max-height: 14rem;
+  }
+
+  .csv-tool__actions button { flex: 1 1 100%; }
+}

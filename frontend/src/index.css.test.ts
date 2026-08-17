@@ -107,4 +107,20 @@ describe('design tokens are the single source of truth', () => {
     expect(css).toMatch(/\.diff__marker--delete[^}]*var\(--diff-del\)/);
     expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.diff__inputs\s*\{[^}]*grid-template-columns:\s*1fr/);
   });
+
+  it('bounds the CSV workbench, preserves tabular text, and contains its 390px layout', () => {
+    expect(css).toMatch(/\.csv-tool\s*\{[^}]*display:\s*flex[^}]*min-width:\s*0[^}]*max-width:\s*100%/);
+    expect(css).toMatch(/\.csv-tool__controls\s*\{[^}]*display:\s*grid/);
+    expect(css).toMatch(/\.csv-tool__panes\s*\{[^}]*display:\s*grid[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.csv-tool__panes > div\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/);
+    expect(css).toMatch(/\.csv-tool__panes textarea\s*\{[^}]*height:\s*18rem[^}]*min-height:\s*18rem[^}]*max-height:\s*18rem/);
+    expect(css).toMatch(/\.csv-tool__actions\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.csv-tool__warnings\s*\{[^}]*var\(--accent-weak\)[^}]*var\(--accent\)/);
+    expect(css).toMatch(/\.csv-tool__status\s*\{[^}]*var\(--accent-strong\)/);
+    expect(css).toMatch(/main section \.csv-tool__preview\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto[^}]*var\(--border\)/);
+    expect(css).toMatch(/\.csv-tool__preview table\s*\{[^}]*min-width:\s*36rem/);
+    expect(css).toMatch(/\.csv-tool__preview :is\(th, td\)\s*\{[^}]*white-space:\s*pre-wrap/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.csv-tool__controls\s*\{[^}]*grid-template-columns:\s*1fr[\s\S]*\.csv-tool__panes\s*\{[^}]*grid-template-columns:\s*1fr/);
+    expect(css).toMatch(/@media \(max-width: 390px\)\s*\{[\s\S]*\.csv-tool__actions button\s*\{[^}]*flex:\s*1 1 100%/);
+  });
 });
